@@ -24,6 +24,10 @@
   },
   "homepage": "https://github.com/modern-agile-team/create-dev-portfolio#readme",
   "dependencies": {
+    "@fullcalendar/core": "^6.1.14",
+    "@fullcalendar/daygrid": "^6.1.14",
+    "@fullcalendar/interaction": "^6.1.14",
+    "@fullcalendar/react": "^6.1.14",
     "env-cmd": "^10.1.0"
   }
 }

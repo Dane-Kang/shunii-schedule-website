@@ -1,0 +1,14 @@
+
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+input[type="text"] {
+  width: 100%;
+  border: none;
+  padding: 8px;
+  box-sizing: border-box;
+}
