@@ -1,5 +1,6 @@
 import * as express from 'express';
 import visitorCtrl from './visitor.ctrl';
+import agentinfoCtrl from '../agentinfo/agentinfo.ctrl';
 import validationCheck from '../middlewares/validationCheck';
 const router: express.Router = express.Router();
 
@@ -9,6 +10,7 @@ router.patch('/count', visitorCtrl.updateAndGetVisitor);
 router.post('/comment', validationCheck, visitorCtrl.createVisitComment);
 
 router.get('/comments', visitorCtrl.getVisitorComments);
+router.get('/agentinfos', agentinfoCtrl.getAgentinfos);
 router.delete('/comment/:id', visitorCtrl.deleteVisitorCommentById);
 router.patch(
   '/comment/:id',

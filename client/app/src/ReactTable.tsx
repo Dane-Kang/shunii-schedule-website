@@ -6,14 +6,17 @@ interface TableProps {
 }
 
 const Table: React.FC<TableProps> = ({ rows }) => {
-  const columns = 4;
+  const columns = 3;
   const [data, setData] = useState<string[][]>(
     Array(rows).fill('').map(() => Array(columns).fill(''))
   );
   // 수동으로 열 너비 설정
-  const columnWidths = [20, 200, 100, 100];
+  const columnWidths = [40, 200, 400];
+  // Header 이름 설정
+  const headerNames = ['이름','직무 등급','원하는 연차 날짜'];
   // 수동으로 열 수정 가능 여부 설정
-  const editableColumns = [true, false, true, false];
+  const editableColumns = [true, true, true, false];
+
 
   const handleInputChange = (rowIndex: number, colIndex: number, value: string) => {
     const newData = data.map((row, rIdx) =>
@@ -22,21 +25,43 @@ const Table: React.FC<TableProps> = ({ rows }) => {
     setData(newData);
   };
 
+  const handleHeaderCheckboxChange = (checked: boolean) => {
+    const newData = data.map((row, rIdx) => {
+      if (checked === true) {
+        row[4] = 'checked'
+      }
+      else {
+        row[4] = 'unchecked'
+      }
+      return row;
+    });
+    setData(newData);
+  };
+
   const handleCheckboxChange = (rowIndex: number, checked: boolean) => {
-    const newData = data.map((row, rIdx) =>
-      rIdx === rowIndex ? ['checked', ...row.slice(1)] : row
-    );
+    const newData = data.map((row, rIdx) => {
+      if(rIdx === rowIndex){
+        return checked ? ['checked', ...row.slice(1)] : ['unchecked', ...row.slice(1)];
+      }
+      return row;
+    });
     setData(newData);
   };
 
   return (
     <div>
-      <table>
+      <table className='table-style'>
         <thead>
           <tr>
+            <th>
+              <input
+                type="checkbox"
+                onChange={(e) => handleHeaderCheckboxChange(e.target.checked)}
+              />
+            </th>
             {columnWidths.map((width, colIndex) => (
               <th key={colIndex} style={{ width: `${width}px` }}>
-                {colIndex + 1}
+                {headerNames[colIndex]}
               </th>
             ))}
           </tr>
@@ -47,7 +72,6 @@ const Table: React.FC<TableProps> = ({ rows }) => {
               <td>
                 <input
                   type="checkbox"
-                  checked={row[0] === 'checked'}
                   onChange={(e) => handleCheckboxChange(rowIndex, e.target.checked)}
                 />
               </td>

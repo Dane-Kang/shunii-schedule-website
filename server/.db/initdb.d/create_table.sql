@@ -19,4 +19,12 @@ CREATE TABLE IF NOT EXISTS `visitor_comments` (
   PRIMARY KEY (`visitor_comment_id`)
 );
 
+CREATE TABLE IF NOT EXISTS `agent_informations` (
+  `agent_information_id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(20) NOT NULL,
+  `job_level` varchar(20) NOT NULL,
+  `description` varchar(255) NOT NULL,
+  PRIMARY KEY (`agent_information_id`)
+);
+
 INSERT INTO number_of_visitors (total_count, today_count) VALUES (0, 0);
