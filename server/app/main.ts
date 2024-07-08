@@ -17,6 +17,7 @@ const portInjectedSwaggerSpec = JSON.stringify(swaggerSpec)
   .replace('{HOST_ADDRESS}', HOST_ADDRESS);
 
 import visitor from './src/apis/visitor';
+import agentinfo from './src/apis/agentinfo';
 
 app.use(cors());
 
@@ -37,5 +38,6 @@ app.use(
 );
 
 app.use('/apis/visitor', visitor);
+app.use('/apis/agentinfo', agentinfo);
 
 export = app;

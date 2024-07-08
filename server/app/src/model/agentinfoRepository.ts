@@ -8,7 +8,7 @@ import { ServerError } from '../service/error';
 class AgentinfoRepository {
 
   async createAgent({
-    nickname,
+    name,
     joblevel,
     description,
   }: AgentinfoDto): Promise<number> {
@@ -17,11 +17,11 @@ class AgentinfoRepository {
       conn = await db.getConnection();
 
       const query = `
-        INSERT INTO agent_informations (nickname, joblevel, description) 
+        INSERT INTO agent_informations (name, job_level, description) 
         VALUES (?, ?, ?);`;
 
       const [row] = await conn.execute<ResultSetHeader>(query, [
-        nickname,
+        name,
         joblevel,
         description,
       ]);
@@ -55,7 +55,7 @@ class AgentinfoRepository {
 
   async updateAgentinfo(
     agentId: number,
-    nickname: string,
+    name: string,
     joblevel: string,
     description: string
   ): Promise<number> {
@@ -63,10 +63,10 @@ class AgentinfoRepository {
     try {
       conn = await db.getConnection();
 
-      const query = `UPDATE agent_informations SET nickname = ?, joblevel = ?, description = ? WHERE agent_information_id = ?`;
+      const query = `UPDATE agent_informations SET name = ?, job_level = ?, description = ? WHERE agent_information_id = ?`;
 
       const [row] = await conn.execute<OkPacket>(query, [
-        nickname,
+        name,
         joblevel,
         description,
         agentId,
@@ -78,13 +78,29 @@ class AgentinfoRepository {
     }
   }
 
+  async getAgentCount(): Promise<number> {
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      const query = `
+        SELECT COUNT(*) AS row_count FROM agent_informations;`;
+
+        const [rows]: [any[], any] = await conn.execute(query);
+
+        return rows[0].row_count;
+    } catch (error) {
+      throw new ServerError('Database Error Occurred');
+    }
+  }
+
   async getAgentinfos(): Promise<AgentinfoEntity[]> {
     let conn;
     try {
       conn = await db.getConnection();
 
       const query = `
-        SELECT agent_information_id AS id, nickname, joblevel, description FROM agent_informations;`;
+        SELECT agent_information_id AS id, name, job_level, description FROM agent_informations;`;
 
       const [row] = await conn.execute<AgentinfoEntity[]>(query);
 

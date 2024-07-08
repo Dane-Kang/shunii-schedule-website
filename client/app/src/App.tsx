@@ -99,8 +99,10 @@ function App() {
       <UnderLine></UnderLine>
 
       <MyCalendar events={events} />
-      <Table rows={5}/>
-      <VisitorComment
+      <Table
+        // id="['직원 명단', 'fluent:comment-add-24-regular']"
+      />
+      {/* <VisitorComment
         id="['직원 명단', 'fluent:comment-add-24-regular']"
         backgroundColor={COLOR.MAIN_COLOR}
         theme="basic" // 'basic' | 'box' | 'vertical'
@@ -127,7 +129,7 @@ function App() {
         handleChangeDescription={handleChangeDescription} // Event handling variable
         handleChangeNickname={handleChangeNickname} // Event handling variable
         handleChangePassword={handleChangePassword} // Event handling variable
-      />
+      /> */}
 
       <Contact
         title="Schedule Calendar"

@@ -1,8 +1,6 @@
 import { AgentinfoDto, AgentinfoEntity } from '../apis/agentinfo/agentinfo';
 import AgentinfoRepository from '../model/agentinfoRepository';
-import bcrypt from 'bcrypt';
 import { BadRequestError, NotFoundError, ServerError } from './error';
-import moment from 'moment';
 
 interface Response {
   success: boolean;
@@ -21,7 +19,7 @@ class Agentinfo {
     const { body } = this;
 
     const agentdata: AgentinfoDto = {
-      nickname: body.nickname,
+      name: body.nickname,
       joblevel: body.joblevel,
       description: body.description,
     };
@@ -35,7 +33,7 @@ class Agentinfo {
   }
   
   async updateAgentinfoById(agentinfoId: number): Promise<Response> {
-    const { nickname, joblevel, description }: AgentinfoDto = this.body;
+    const { name, joblevel, description }: AgentinfoDto = this.body;
 
     const agentinfo = await this.agentinfoRepository.getAgentinfoById(
       agentinfoId
@@ -45,12 +43,18 @@ class Agentinfo {
 
     await this.agentinfoRepository.updateAgentinfo(
       agentinfoId,
-      nickname,
+      name,
       joblevel,
       description
     );
 
     return { success: true, msg: 'Visitor comment update complete' };
+  }
+
+  async getAgentCount(): Promise<number> {
+    const agentcount = await this.agentinfoRepository.getAgentCount();
+
+    return agentcount;
   }
 
   async getAgentinfos(): Promise<{ agentinfos: AgentinfoEntity[] }> {

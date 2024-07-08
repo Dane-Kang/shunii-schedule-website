@@ -1,55 +1,52 @@
 import React, { useState, useEffect } from "react";
 import agentAPI from "../apis/agent";
 
-const useComment = () => {
-  const [commentList, setCommentList] = useState<any[] | undefined>(undefined);
-  const [comment, setComment] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [password, setPassword] = useState("");
-  const initializeCommentState = () => {
-    setComment("");
-    setNickname("");
-    setPassword("");
+const useAgent = () => {
+  const [rows, setRows] = useState<number>(0);
+  const [agentList, setAgentList] = useState<any[] | undefined>(undefined);
+  const [description, setDescription] = useState("");
+  const [name, setName] = useState("");
+  const [joblevel, setJoblevel] = useState("");
+  const initializeAgentState = () => {
+    setDescription("");
+    setName("");
+    setJoblevel("");
   };
   const handleChangeDescription = (e?: React.ChangeEvent<HTMLElement>) => {
     if (!e) return;
     const target = e.currentTarget as HTMLTextAreaElement;
-    setComment(target.value);
+    setDescription(target.value);
   };
-  const handleChangeNickname = (e?: React.ChangeEvent<HTMLElement>) => {
+  const handleChangeName = (e?: React.ChangeEvent<HTMLElement>) => {
     if (!e) return;
     const target = e.currentTarget as HTMLInputElement;
-    setNickname(target.value);
+    setName(target.value);
   };
-  const handleChangePassword = (e?: React.ChangeEvent<HTMLElement>) => {
+  const handleChangeJoblevel = (e?: React.ChangeEvent<HTMLElement>) => {
     if (!e) return;
     const target = e.currentTarget as HTMLInputElement;
-    setPassword(target.value);
+    setJoblevel(target.value);
   };
 
   const handleCreateComment = async (
     e?: React.MouseEvent<HTMLButtonElement>
   ) => {
-    const data = { nickname, password, description: comment };
+    const data = { name, joblevel, description};
     const result = await agentAPI.createAgentinfo(data);
     if (result.statusCode === 400) {
       alert(result.detail[0].constraints.isLength);
-      initializeCommentState();
+      initializeAgentState();
       return;
     }
-    const date = new Date();
-    let year = date.getFullYear();
-    let month = date.getMonth() + 1;
-    let today = date.getDate();
 
-    if (!commentList) {
-      setCommentList([data]);
+    if (!agentList) {
+      setAgentList([data]);
     } else {
-      setCommentList([
-        ...commentList,
-        { ...data, date: `${year}-${month}-${today}` },
+      setAgentList([
+        ...agentList,
+        { ...data},
       ]);
-      initializeCommentState();
+      initializeAgentState();
       console.log(result);
     }
   };
@@ -58,20 +55,23 @@ const useComment = () => {
     (async () => {
       const result = await agentAPI.getAgentinfo();
       console.log(result);
-      setCommentList(result.visitorComments);
+      setAgentList(result.agentinfos);
+      const count = await agentAPI.getAgentCount();
+      setRows(count.response);
     })();
   }, []);
 
   return {
     handleChangeDescription,
-    handleChangeNickname,
-    handleChangePassword,
+    handleChangeName,
+    handleChangeJoblevel,
     handleCreateComment,
-    commentList,
-    comment,
-    nickname,
-    password,
+    agentList,
+    description,
+    name,
+    joblevel,
+    rows,
   };
 };
 
-export default useComment;
+export default useAgent;

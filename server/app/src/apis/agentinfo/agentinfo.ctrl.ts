@@ -8,6 +8,7 @@ const createAgentinfo = async (req: Request, res: Response) => {
   const RequestAgentinfo = Object.assign(req.body);
 
   try {
+    console.log('Enter createAgentinfo');
     if (RequestAgentinfo.nickname?.length === 0)
       req.body.nickname = '익명';
 
@@ -32,6 +33,7 @@ const updateAgentinfoById = async (req: Request, res: Response) => {
   const RequestAgentinfo = Object.assign(req.body);
 
   try {
+    console.log('Enter updateAgentinfoById');
     const agentinfo = new Agentinfo(new AgentinfoRepository(), RequestAgentinfo);
 
     const response = await agentinfo.updateAgentinfoById(Number(AgentId));
@@ -44,8 +46,21 @@ const updateAgentinfoById = async (req: Request, res: Response) => {
   }
 };
 
+const getAgentCount = async (req: Request, res: Response) => {
+  try {
+    console.log('Enter getAgentCount');
+    const agentinfo = new Agentinfo(new AgentinfoRepository());
+    const response = await agentinfo.getAgentCount();
+
+    return res.status(200).json({ statusCode: 200, response });
+  } catch (err) {
+    return errorResposne(err, res);
+  }
+};
+
 const getAgentinfos = async (req: Request, res: Response) => {
   try {
+    console.log('Enter getAgentinfos');
     const agentinfo = new Agentinfo(new AgentinfoRepository());
 
     const response = await agentinfo.getAgentinfos();
@@ -58,6 +73,7 @@ const getAgentinfos = async (req: Request, res: Response) => {
 
 const deleteAgentinfoById = async (req: Request, res: Response) => {
   try {
+    console.log('Enter deleteAgentinfoById');
     const AgentId = req.params.id;
 
     if (!AgentId) throw new BadRequestError('id params is undefined');
@@ -81,6 +97,7 @@ const deleteAgentinfoById = async (req: Request, res: Response) => {
 export = {
   createAgentinfo,
   updateAgentinfoById,
+  getAgentCount,
   getAgentinfos,
   deleteAgentinfoById,
 };
