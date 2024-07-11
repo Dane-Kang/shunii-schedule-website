@@ -19,7 +19,7 @@ class Agentinfo {
     const { body } = this;
 
     const agentdata: AgentinfoDto = {
-      name: body.nickname,
+      name: body.name,
       joblevel: body.joblevel,
       description: body.description,
     };

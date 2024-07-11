@@ -15,5 +15,4 @@ router.patch(
   validationCheck,
   visitorCtrl.updateVisitCommentById
 );
-console.log('visitor index');
 export default router;

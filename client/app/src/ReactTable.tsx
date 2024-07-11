@@ -12,14 +12,14 @@ export interface Agent {
 const Table: React.FC = () => {
   const {
     agentList,
-    description,
-    name,
-    joblevel,
+    // description,
+    // name,
+    // joblevel,
     rows,
     handleChangeDescription,
     handleChangeName,
     handleChangeJoblevel,
-    handleCreateComment,
+    handleCreateAgent,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
@@ -45,14 +45,14 @@ const Table: React.FC = () => {
   // 새로운 행 추가 함수
   const addRow = () => {
     const newRow: Agent = { name: '', job_level: '', description: '', isNew: true }; // 기본값을 가진 새 행
-    
     setData([...data, newRow]);
   };
 
   // 새로운 행 저장 함수
-  const saveRow = (rowIndex: number) => {
-    const newRow: Agent = { name: '', job_level: '', description: '' }; // 기본값을 가진 새 행
-    setData([...data, newRow]);
+  const saveRow = (row: Agent) => {
+    console.log('selected row',row);
+    if(row)
+      handleCreateAgent(row.name, row.job_level, row.description);
   };
 
   // 행 삭제 함수
@@ -83,6 +83,7 @@ const Table: React.FC = () => {
   // };
 
   const handleInputChange = (rowIndex: number, field: keyof Agent, value: string) => {
+    console.log('handleInputChange row ', rowIndex, 'field ', field, 'value', value);
     const newData = data.map((row, rIdx) =>
       rIdx === rowIndex ? { ...row, [field]: value } : row
     );
@@ -138,7 +139,7 @@ const Table: React.FC = () => {
               ))}
               <td>
                 {row.isNew && (
-                  <button onClick={() => saveRow(rowIndex)}>Save</button>
+                  <button onClick={() => saveRow(row)}>Save</button>
                 )}
               </td>
             </tr>

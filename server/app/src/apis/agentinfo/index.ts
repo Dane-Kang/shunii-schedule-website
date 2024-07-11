@@ -5,5 +5,5 @@ const router: express.Router = express.Router();
 
 router.get('/count', agentinfoCtrl.getAgentCount);
 router.get('/infos', agentinfoCtrl.getAgentinfos);
-console.log('agentinfo index');
+router.post('/infos', agentinfoCtrl.createAgentinfo);
 export default router;
