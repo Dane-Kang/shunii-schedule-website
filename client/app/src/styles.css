@@ -6,7 +6,7 @@
 th, td {
   border: 1px solid #ccc;
   padding: 4px;
-  text-align: left;
+  text-align: middle;
 }
 
 input[type="text"] {

@@ -9,8 +9,8 @@ const createAgentinfo = async (req: Request, res: Response) => {
 
   try {
     console.log('Enter createAgentinfo');
-    if (RequestAgentinfo.nickname?.length === 0)
-      req.body.nickname = '익명';
+    if (RequestAgentinfo.name?.length === 0)
+      req.body.name = '익명';
 
     const agentinfo = new Agentinfo(new AgentinfoRepository(), RequestAgentinfo);
 
