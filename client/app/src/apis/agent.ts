@@ -14,6 +14,10 @@ class AgentinfoHTTP {
   async createAgentinfo(body: any) {
     return await this.instance.post("/apis/agentinfo/infos", body);
   }
+
+  async updateAgentinfo(agentid:number, body: any) {
+    return await this.instance.patch(`/apis/agentinfo/infos/${agentid}`, body);
+  }
 }
 
 const agentAPI = new AgentinfoHTTP();

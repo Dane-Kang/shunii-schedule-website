@@ -35,11 +35,22 @@ export class HTTP {
     }).then((res) => res.json());
   }
 
-  async patch(api: string) {
+  // async patch(api: string) {
+  //   return await fetch(`${this.domain}${api}`, {
+  //     method: "PATCH",
+  //   }).then((res) => res.json());
+  // }
+
+  async patch(api: string, data: any) {
     return await fetch(`${this.domain}${api}`, {
       method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
     }).then((res) => res.json());
   }
+
 }
 
 const instance = new HTTP(

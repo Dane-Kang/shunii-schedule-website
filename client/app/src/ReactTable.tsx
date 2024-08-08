@@ -21,6 +21,7 @@ const Table: React.FC = () => {
     handleChangeName,
     handleChangeJoblevel,
     handleCreateAgent,
+    handleUpdateAgent,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
@@ -51,11 +52,12 @@ const Table: React.FC = () => {
     if(row){
       if(!row.ischecked){
         if(rows >= rowIndex + 1){
-          console.log("Save Existing Agent");
+          console.log("Update Existing Agent");
+          handleUpdateAgent(rowIndex+1, row.name, row.job_level, row.description);
         }
         else {
           console.log("Save New Agent");
-          //handleCreateAgent(row.name, row.job_level, row.description);
+          handleCreateAgent(row.name, row.job_level, row.description);
         }
       }
       else{

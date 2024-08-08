@@ -36,20 +36,32 @@ const useAgent = () => {
     const result = await agentAPI.createAgentinfo(data);
     if (result.statusCode === 400) {
       alert(result.detail[0].constraints.isLength);
-      // initializeAgentState();
       return;
     }
-    console.log('handleCreateAgent 1');
-    if (!agentList) {
-      setAgentList([data]);
-    } else {
-      setAgentList([
-        ...agentList,
-        { ...data},
-      ]);
-      // initializeAgentState();
-      console.log(result);
+
+    syncAgentList();
+  };
+
+  const handleUpdateAgent = async (id:number,
+    name: string, joblevel: string, description: string
+  ) => {
+    const data = { name, joblevel, description};
+    console.log('handleUpdateAgent data',data, 'id ',id);
+    const result = await agentAPI.updateAgentinfo(id, data);
+    if (result.statusCode === 400) {
+      alert(result.detail[0].constraints.isLength);
+      return;
     }
+    console.log('handleUpdateAgent 1');
+
+    syncAgentList();
+    
+  };
+
+  const syncAgentList = async () => {
+    const result = await agentAPI.getAgentinfo();
+    console.log(result);
+    setAgentList(result.agentinfos);
   };
 
   useEffect(() => {
@@ -67,6 +79,7 @@ const useAgent = () => {
     handleChangeName,
     handleChangeJoblevel,
     handleCreateAgent,
+    handleUpdateAgent,
     agentList,
     // description,
     // name,

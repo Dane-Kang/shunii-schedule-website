@@ -18,14 +18,14 @@ import { EventInput } from '@fullcalendar/core';
 import Table from './ReactTable';
 
 function App() {
-  const [todayCounter, setTodayCounter] = useState<number>(0);
-  const [totalCounter, setTotalCounter] = useState<number>(0);
+  //const [todayCounter, setTodayCounter] = useState<number>(0);
+  //const [totalCounter, setTotalCounter] = useState<number>(0);
 
   useEffect(() => {
     (async () => {
-      const result = await countAPI.getCount();
-      setTodayCounter(result.todayCount);
-      setTotalCounter(result.totalCount);
+      //const result = await countAPI.getCount();
+      //setTodayCounter(result.todayCount);
+      //setTotalCounter(result.totalCount);
     })();
   }, []);
 
@@ -80,7 +80,7 @@ function App() {
         }}
       />
 
-      <VisitorCounter
+      {/* <VisitorCounter
         theme="big-size"
         backgroundColor={COLOR.MAIN_COLOR}
         size="14px"
@@ -94,7 +94,7 @@ function App() {
         totalTitleColor={COLOR.POINT_COLOR}
         totalVisitor={totalCounter}
         totalVisitorColor={COLOR.CLEAN_BLUE}
-      />
+      /> */}
 
       <UnderLine></UnderLine>
 
