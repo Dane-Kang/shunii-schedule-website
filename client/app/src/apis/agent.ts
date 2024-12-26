@@ -18,6 +18,10 @@ class AgentinfoHTTP {
   async updateAgentinfo(agentid:number, body: any) {
     return await this.instance.patch(`/apis/agentinfo/infos/${agentid}`, body);
   }
+
+  async deleteAgentinfo(agentid:number, body: any) {
+    return await this.instance.delete(`/apis/agentinfo/infos/${agentid}`, body);
+  }
 }
 
 const agentAPI = new AgentinfoHTTP();

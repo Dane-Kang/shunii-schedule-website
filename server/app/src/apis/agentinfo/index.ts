@@ -6,7 +6,7 @@ const router: express.Router = express.Router();
 router.get('/count', agentinfoCtrl.getAgentCount);
 router.get('/infos', agentinfoCtrl.getAgentinfos);
 router.post('/infos', agentinfoCtrl.createAgentinfo);
-router.delete('/comment/:id', agentinfoCtrl.deleteAgentinfoById);
+router.delete('/infos/:id', agentinfoCtrl.deleteAgentinfoById);
 router.patch(
     '/infos/:id',
     agentinfoCtrl.updateAgentinfoById

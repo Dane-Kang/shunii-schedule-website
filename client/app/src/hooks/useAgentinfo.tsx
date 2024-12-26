@@ -58,6 +58,23 @@ const useAgent = () => {
     
   };
 
+  const handleDeleteAgent = async (id:number,
+    name: string, joblevel: string, description: string
+  ) => {
+    const data = { name, joblevel, description};
+    console.log('deleteAgentinfo data',data, 'id ',id);
+    
+    const result = await agentAPI.deleteAgentinfo(id, data);
+    if (result.statusCode === 400) {
+      alert(result.detail[0].constraints.isLength);
+      return;
+    }
+    console.log('deleteAgentinfo 1');
+
+    syncAgentList();
+    
+  };
+
   const syncAgentList = async () => {
     const result = await agentAPI.getAgentinfo();
     console.log(result);
@@ -80,6 +97,7 @@ const useAgent = () => {
     handleChangeJoblevel,
     handleCreateAgent,
     handleUpdateAgent,
+    handleDeleteAgent,
     agentList,
     // description,
     // name,

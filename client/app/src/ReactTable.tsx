@@ -27,6 +27,7 @@ const Table: React.FC = () => {
     handleChangeJoblevel,
     handleCreateAgent,
     handleUpdateAgent,
+    handleDeleteAgent,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
@@ -86,6 +87,7 @@ const Table: React.FC = () => {
 
   // 새로운 행 저장/삭제 함수
   const setRowEvent = (row: Agent, rowIndex: number) => {
+    
     if(row){
       if(!row.ischecked){
         if(rows >= rowIndex + 1){
@@ -99,8 +101,7 @@ const Table: React.FC = () => {
       }
       else{
         console.log("Delete Agent");
-        //const newData = data.filter((_, index) => index !== rowIndex);
-        //setData(newData);
+        handleDeleteAgent(rowIndex+1, row.name, row.job_level, row.description);
       }
     }
   };
