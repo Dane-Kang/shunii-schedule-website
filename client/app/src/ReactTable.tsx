@@ -18,34 +18,24 @@ export interface Agent {
 const Table: React.FC = () => {
   const {
     agentList,
-    // description,
-    // name,
-    // joblevel,
     rows,
-    handleChangeDescription,
-    handleChangeName,
-    handleChangeJoblevel,
+    selectedDates,
     handleCreateAgent,
     handleUpdateAgent,
     handleDeleteAgent,
+    setSelectedDates,
+    setSelectedDateList,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
-  const [selectedDates, setSelectedDates] = useState<{ [key: number]: DateObject[] }>({});
 
   // 수동으로 열 너비 설정
   const columnWidths = [60, 160, 300];
   // Header 이름 설정
-  const headerNames = ['이름','직무 등급','원하는 연차 날짜'];
+  const headerNames = ['이름','직무 등급','원하는 휴일'];
   // 수동으로 열 수정 가능 여부 설정
   const editableColumns = [true, true, true, true];
 
-  const getDescriptionValue = (value: any): Date[] => {
-    if (Array.isArray(value)) {
-      return value;
-    }
-    return [];
-  };
 
   // agentList를 기반으로 데이터 설정
   useEffect(() => {
@@ -53,29 +43,6 @@ const Table: React.FC = () => {
       const filteredinfo = agentList.map(({id, ...rest}) => rest); // id를 제외한 데이터로 변환
       console.log('filteredinfo :',filteredinfo);
       setData(filteredinfo);
-
-      const selectedDatesMapping: { [key: number]: DateObject[] } = {};
-
-      let rowid: number = 0;
-      filteredinfo.forEach((agent) => {
-        const description = agent.description;
-
-        const serverDates = description.split(',').map((date: string) => date.trim());  // 공백을 제거하고 배열로 변환
-        console.log('foreach serverDates :',serverDates);
-
-        const dateObjects = serverDates.map((dateStr: string) => {
-          const trimmedDateStr = dateStr.trim(); // 공백 제거
-          const [year, month, day] = trimmedDateStr.split('-').map(Number);
-          return new DateObject({ year, month, day });
-        });
-        console.log('selecetdata :',dateObjects);
-
-        selectedDatesMapping[rowid] = dateObjects;
-        rowid++;
-      });
-
-      // selectedDates 업데이트
-      setSelectedDates(selectedDatesMapping);
     }
   }, [agentList]);
 
