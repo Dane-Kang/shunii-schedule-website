@@ -29,7 +29,7 @@ const useAgent = () => {
     syncAgentList();
   };
 
-  const handleUpdateAgent = async (id:number,
+  const handleUpdateAgent = async (id:string,
     name: string, joblevel: string, description: string
   ) => {
     const data = { name, joblevel, description};
@@ -43,7 +43,7 @@ const useAgent = () => {
     syncAgentList();
   };
 
-  const handleDeleteAgent = async (id:number,
+  const handleDeleteAgent = async (id:string,
     name: string, joblevel: string, description: string
   ) => {
     const data = { name, joblevel, description};
@@ -59,8 +59,11 @@ const useAgent = () => {
   };
 
   const syncAgentList = async () => {
+    console.log("syncAgentList");
     const result = await agentAPI.getAgentinfo();
     setAgentList(result.agentinfos);
+    const count = await agentAPI.getAgentCount();
+    setRows(count.response);
   };
 
   const setSelectedDateList = async () => {
@@ -90,6 +93,7 @@ const useAgent = () => {
 
   useEffect(() => {
     (async () => {
+      console.log("useEffect");
       const result = await agentAPI.getAgentinfo();
       setAgentList(result.agentinfos);
       const count = await agentAPI.getAgentCount();

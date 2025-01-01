@@ -36,7 +36,7 @@ const updateAgentinfoById = async (req: Request, res: Response) => {
     console.log('Enter updateAgentinfoById');
     const agentinfo = new Agentinfo(new AgentinfoRepository(), RequestAgentinfo);
 
-    const response = await agentinfo.updateAgentinfoById(Number(AgentId));
+    const response = await agentinfo.updateAgentinfoById(String(AgentId));
 
     if (!response.success)
       return res.status(401).json({ statusCode: 401, msg: response.msg });
@@ -81,7 +81,7 @@ const deleteAgentinfoById = async (req: Request, res: Response) => {
     const agentinfo = new Agentinfo(new AgentinfoRepository());
 
     const response = await agentinfo.deleteAgentinfoById(
-      Number(AgentId)
+      String(AgentId)
     );
 
     if (response)

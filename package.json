@@ -28,6 +28,8 @@
     "@fullcalendar/daygrid": "^6.1.14",
     "@fullcalendar/interaction": "^6.1.14",
     "@fullcalendar/react": "^6.1.14",
-    "env-cmd": "^10.1.0"
+    "@types/react-modal": "^3.16.3",
+    "env-cmd": "^10.1.0",
+    "react-modal": "^3.16.3"
   }
 }

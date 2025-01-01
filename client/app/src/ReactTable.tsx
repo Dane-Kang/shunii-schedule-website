@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Modal from 'react-modal';
 import useAgent from "./hooks/useAgentinfo";
 import DatePicker from 'react-multi-date-picker';
 import "react-multi-date-picker/styles/layouts/mobile.css";
@@ -8,12 +9,15 @@ import './styles.css';
 import Day from 'react-datepicker/dist/day';
 
 export interface Agent {
+  id: string;
   name: string;
   job_level: string;
   description: string;
   isNew?: boolean; // 추가된 행 여부를 나타내는 필드
   ischecked?: boolean;
 }
+
+Modal.setAppElement('#root');
 
 const Table: React.FC = () => {
   const {
@@ -28,6 +32,9 @@ const Table: React.FC = () => {
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
+  const [isModalOpen, setIsModalOpen] = useState(false); // 모달 열기/닫기 상태
+  const [modalMessage, setModalMessage] = useState(""); // 모달에 표시할 메시지
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null); // 확인 버튼에서 실행할 함수 저장
 
   // 수동으로 열 너비 설정
   const columnWidths = [60, 160, 300];
@@ -40,35 +47,66 @@ const Table: React.FC = () => {
   // agentList를 기반으로 데이터 설정
   useEffect(() => {
     if (agentList) {
-      const filteredinfo = agentList.map(({id, ...rest}) => rest); // id를 제외한 데이터로 변환
-      console.log('filteredinfo :',filteredinfo);
-      setData(filteredinfo);
+      console.log(agentList);
+      setData(agentList);
     }
   }, [agentList]);
 
   // 새로운 행 추가 함수
   const addRow = () => {
-    const newRow: Agent = { name: '', job_level: '', description: ''}; // 기본값을 가진 새 행
+    const newRow: Agent = { id: '', name: '', job_level: '', description: ''}; // 기본값을 가진 새 행
     setData([...data, newRow]);
   };
 
+  const openModal = (message: string, onConfirm: () => void) => {
+    setModalMessage(message); // 모달 메시지 설정
+    setConfirmAction(() => onConfirm); // 확인 시 실행할 함수 설정
+    setIsModalOpen(true); // 모달 열기
+  };
+
+  // 모달 닫기
+  const closeModal = () => {
+    setIsModalOpen(false); // 모달 닫기
+  };
+
+  // 확인 버튼 클릭 시 처리할 작업
+  const handleConfirm = () => {
+    if (confirmAction) {
+      confirmAction(); // 저장된 확인 함수 실행
+      closeModal(); // 모달 닫기
+    }
+  };
+
+  // 취소 버튼 클릭 시 모달 닫기
+  const handleCancel = () => {
+    closeModal(); // 모달 닫기
+  };
+
   // 새로운 행 저장/삭제 함수
-  const setRowEvent = (row: Agent, rowIndex: number) => {
-    
+  const setRowEvent = (row: Agent, rowIndex: number) => {    
     if(row){
       if(!row.ischecked){
+        handleDatePickerClose(rowIndex);
         if(rows >= rowIndex + 1){
+          openModal("레알로 업데이트 하실??", () => {
+            row.description = data[rowIndex].description;
+            handleUpdateAgent(row.id, row.name, row.job_level, row.description); // 확인 후 업데이트
+          });
           console.log("Update Existing Agent");
-          handleUpdateAgent(rowIndex+1, row.name, row.job_level, row.description);
         }
         else {
+          openModal("레알로 새거 만드실??", () => {
+            row.description = data[rowIndex].description;
+            handleCreateAgent(row.name, row.job_level, row.description); // 확인 후 업데이트
+          });
           console.log("Save New Agent");
-          handleCreateAgent(row.name, row.job_level, row.description);
         }
       }
       else{
+        openModal("지우실??", () => {
+          handleDeleteAgent(row.id, row.name, row.job_level, row.description); // 확인 후 업데이트
+        });
         console.log("Delete Agent");
-        handleDeleteAgent(rowIndex+1, row.name, row.job_level, row.description);
       }
     }
   };
@@ -193,6 +231,45 @@ const Table: React.FC = () => {
         </tbody>
       </table>
       <button onClick={addRow}> 추가 </button>
+
+      <Modal
+        isOpen={isModalOpen}
+        onRequestClose={handleCancel} // 모달 외부 클릭 시 닫기
+        contentLabel="Action Confirmation"
+        style={{
+          overlay: {
+            backgroundColor: 'rgba(255, 255, 255, 0.8)', // 흰색 반투명 배경
+            zIndex: 1000, // 다른 콘텐츠 위로 띄우기
+          },
+          content: {
+            backgroundColor: 'white', // 모달 배경 색을 흰색으로 설정
+            padding: '20px', // padding을 줄여서 세로 크기 조절
+            borderRadius: '10px',
+            width: '200px',
+            height: '100px', // 모달의 세로 크기 설정
+            margin: '0 auto',
+            top: '50%', // 화면 중앙에서 50% 위치
+            left: '0%', // 화면 중앙에서 50% 위치
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.2)', // 모달 그림자
+          },
+        }}
+      >
+        <h2 style={{ 
+          fontSize: '17px',
+          textAlign: 'center',
+          alignItems: 'center'
+         }}>{modalMessage}</h2>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          // justifyContent: 'space-between', // 버튼 간격을 양쪽으로 조정
+          gap: '50px', // 버튼 간의 간격을 10px로 설정
+          marginTop: '30px', // 버튼 위쪽에 여백 추가
+        }}>
+          <button onClick={handleConfirm}>확인</button>
+          <button onClick={handleCancel}>취소</button>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -7,7 +7,7 @@ export interface AgentinfoDto {
 }
 
 export interface AgentinfoEntity extends RowDataPacket {
-  id: number;
+  id: string;
   name: string;
   joblevel: string;
   description: string;

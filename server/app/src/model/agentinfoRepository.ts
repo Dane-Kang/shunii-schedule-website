@@ -11,14 +11,15 @@ class AgentinfoRepository {
     name,
     joblevel,
     description,
-  }: AgentinfoDto): Promise<number> {
+  }: AgentinfoDto): Promise<string> {
     let conn;
     try {
       conn = await db.getConnection();
+      console.log("enter createAgent");
 
       const query = `
-        INSERT INTO agent_informations (name, job_level, description) 
-        VALUES (?, ?, ?);`;
+        INSERT INTO agent_informations (agent_information_id, name, job_level, description) 
+        VALUES (UUID(), ?, ?, ?);`;
 
       const [row] = await conn.execute<ResultSetHeader>(query, [
         name,
@@ -26,7 +27,7 @@ class AgentinfoRepository {
         description,
       ]);
 
-      return row.insertId;
+      return "true";
     } catch (error) {
       throw new ServerError('Database Error Occurred');
     } finally {
@@ -35,7 +36,7 @@ class AgentinfoRepository {
   }
 
   async getAgentinfoById(
-    agentId: number
+    agentId: string
   ): Promise<AgentinfoEntity> {
     let conn;
     try {
@@ -54,7 +55,7 @@ class AgentinfoRepository {
   }
 
   async updateAgentinfo(
-    agentId: number,
+    agentId: string,
     name: string,
     joblevel: string,
     description: string
@@ -110,7 +111,7 @@ class AgentinfoRepository {
     }
   }
 
-  async deleteAgentinfoById(id: number): Promise<number> {
+  async deleteAgentinfoById(id: string): Promise<number> {
     let conn;
     try {
       conn = await db.getConnection();

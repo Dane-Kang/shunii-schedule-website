@@ -15,7 +15,7 @@ class Agentinfo {
     this.body = body;
   }
 
-  async createAgent(): Promise<number> {
+  async createAgent(): Promise<string> {
     const { body } = this;
 
     const agentdata: AgentinfoDto = {
@@ -32,7 +32,7 @@ class Agentinfo {
     throw new ServerError('Interver Server Error');
   }
   
-  async updateAgentinfoById(agentinfoId: number): Promise<Response> {
+  async updateAgentinfoById(agentinfoId: string): Promise<Response> {
     const { name, joblevel, description }: AgentinfoDto = this.body;
 
     const agentinfo = await this.agentinfoRepository.getAgentinfoById(
@@ -63,7 +63,7 @@ class Agentinfo {
     return { agentinfos };
   }
 
-  async deleteAgentinfoById(agentinfoId: number): Promise<boolean> {
+  async deleteAgentinfoById(agentinfoId: string): Promise<boolean> {
     const agentdata = await this.agentinfoRepository.getAgentinfoById(
       agentinfoId
     );

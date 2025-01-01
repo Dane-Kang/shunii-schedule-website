@@ -15,11 +15,11 @@ class AgentinfoHTTP {
     return await this.instance.post("/apis/agentinfo/infos", body);
   }
 
-  async updateAgentinfo(agentid:number, body: any) {
+  async updateAgentinfo(agentid:string, body: any) {
     return await this.instance.patch(`/apis/agentinfo/infos/${agentid}`, body);
   }
 
-  async deleteAgentinfo(agentid:number, body: any) {
+  async deleteAgentinfo(agentid:string, body: any) {
     return await this.instance.delete(`/apis/agentinfo/infos/${agentid}`, body);
   }
 }

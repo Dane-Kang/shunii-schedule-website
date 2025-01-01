@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS `visitor_comments` (
 );
 
 CREATE TABLE IF NOT EXISTS `agent_informations` (
-  `agent_information_id` int NOT NULL AUTO_INCREMENT,
+  `agent_information_id` CHAR(36) NOT NULL,
   `name` varchar(20) NOT NULL,
   `job_level` varchar(20) NOT NULL,
   `description` varchar(255) NOT NULL,
