@@ -1,11 +1,39 @@
-import React, { useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import agentAPI from "../apis/agent";
 import { DateObject } from 'react-multi-date-picker'; // DateObject를 임포트
+import { EventInput } from '@fullcalendar/core';
+
+// interface LeaveListContextType {
+//   leaveList: EventInput[];
+//   setLeaveList: React.Dispatch<React.SetStateAction<EventInput[]>>;
+// }
+
+// const LeaveListContext = createContext<LeaveListContextType | undefined>(undefined);
+// export const LeaveListProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+//   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
+
+//   return (
+//     <LeaveListContext.Provider value={{ leaveList, setLeaveList }}>
+//       {children}
+//     </LeaveListContext.Provider>
+//   );
+// };
+
+// export const useLeaveList = () => {
+//   const context = useContext(LeaveListContext);
+//   if (!context) {
+//     throw new Error("useLeaveList must be used within a LeaveListProvider");
+//   }
+//   return context;
+// };
+
 
 const useAgent = () => {
   const [rows, setRows] = useState<number>(0);
   const [agentList, setAgentList] = useState<any[] | undefined>(undefined);
-  const [selectedDates, setSelectedDates] = useState<{ [key: number]: DateObject[] }>({});
+  const [selectedDates, setSelectedDates] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
+  //const { leaveList, setLeaveList } = useLeaveList();
+  const [leaveList, setLeaveList] = useState<EventInput[]>([]);
   // const [description, setDescription] = useState("");
   // const [name, setName] = useState("");
   // const [joblevel, setJoblevel] = useState("");
@@ -67,12 +95,14 @@ const useAgent = () => {
   };
 
   const setSelectedDateList = async () => {
-    const selectedDatesMapping: { [key: number]: DateObject[] } = {};
-    let rowid: number = 0;
+    const selectedDatesMapping: { [key: number]: {name:string; date:DateObject[]} } = {};
+    const selectedleaveMapping:EventInput[] = [];
+    // let rowid: number = 0;
     if(agentList){
       const filteredinfo = agentList.map(({id, ...rest}) => rest); // id를 제외한 데이터로 변환
-      filteredinfo.forEach((agent) => {
+      filteredinfo.forEach((agent, rowid) => {
         const description = agent.description;
+        const name = agent.name;
         const serverDates = description.split(',').map((date: string) => date.trim());  // 공백을 제거하고 배열로 변환
         
         const dateObjects = serverDates.map((dateStr: string) => {
@@ -81,21 +111,27 @@ const useAgent = () => {
           return new DateObject({ year, month, day });
         });
         
-        selectedDatesMapping[rowid] = dateObjects;
-        rowid++;
+        selectedDatesMapping[rowid] = { name, date: dateObjects };
+
+        const eventInput:EventInput[] = description.split(',').map((date: string) => {
+          return {title:name,start:date.trim()};
+        });
+
+        selectedleaveMapping.push(...eventInput); //selectedleaveMapping에 eventInput 추가
       });
-      
+
+      // setLeaveList 업데이트
+      setLeaveList(selectedleaveMapping);
       // selectedDates 업데이트
-      console.log('setSelectedDateList : ',selectedDatesMapping);
       setSelectedDates(selectedDatesMapping);
     }
   };
 
   useEffect(() => {
     (async () => {
-      console.log("useEffect");
       const result = await agentAPI.getAgentinfo();
       setAgentList(result.agentinfos);
+      console.log(agentList);
       const count = await agentAPI.getAgentCount();
       setRows(count.response);
     })();
@@ -114,6 +150,7 @@ const useAgent = () => {
     agentList,
     rows,
     selectedDates,
+    leaveList,
   };
 };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Modal from 'react-modal';
 import useAgent from "./hooks/useAgentinfo";
 import DatePicker from 'react-multi-date-picker';
@@ -42,15 +42,20 @@ const Table: React.FC = () => {
   const headerNames = ['이름','직무 등급','원하는 휴일'];
   // 수동으로 열 수정 가능 여부 설정
   const editableColumns = [true, true, true, true];
-
-
+  
+  const dataRef = useRef(data);
+  
   // agentList를 기반으로 데이터 설정
   useEffect(() => {
     if (agentList) {
-      console.log(agentList);
+      console.log("useEffect agentList :",agentList);
       setData(agentList);
     }
   }, [agentList]);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]); // data가 변경될 때마다 실행됨
 
   // 새로운 행 추가 함수
   const addRow = () => {
@@ -88,22 +93,24 @@ const Table: React.FC = () => {
       if(!row.ischecked){
         handleDatePickerClose(rowIndex);
         if(rows >= rowIndex + 1){
-          openModal("레알로 업데이트 하실??", () => {
-            row.description = data[rowIndex].description;
+          openModal("Update this info??", () => {
+            console.log("dataRef.current :", dataRef.current);
+            row.description = dataRef.current[rowIndex].description;
             handleUpdateAgent(row.id, row.name, row.job_level, row.description); // 확인 후 업데이트
           });
           console.log("Update Existing Agent");
         }
         else {
-          openModal("레알로 새거 만드실??", () => {
-            row.description = data[rowIndex].description;
+          openModal("Create New Agent??", () => {
+            console.log("dataRef.current :", dataRef.current);
+            row.description = dataRef.current[rowIndex].description;
             handleCreateAgent(row.name, row.job_level, row.description); // 확인 후 업데이트
           });
           console.log("Save New Agent");
         }
       }
       else{
-        openModal("지우실??", () => {
+        openModal("Delete??", () => {
           handleDeleteAgent(row.id, row.name, row.job_level, row.description); // 확인 후 업데이트
         });
         console.log("Delete Agent");
@@ -112,39 +119,33 @@ const Table: React.FC = () => {
   };
 
   const handleDateChange = (rowIndex: number, dates: DateObject[]) => {
-    selectedDates[rowIndex] = dates;
-
+    if(!selectedDates[rowIndex]){
+      selectedDates[rowIndex] = {name:"", date:[]};
+    }
+    selectedDates[rowIndex].date = dates;
     setSelectedDates(selectedDates);
-    console.log(dates);
   };
 
-  const handleDatePickerClose = (rowIndex: number) => {
-    // DatePicker가 닫힐 때 호출되는 함수
-    // 선택된 날짜들을 처리
-    const formattedDates = selectedDates[rowIndex].map(date => {
+  const handleDatePickerClose = (rowIndex: number) => { // DatePicker가 닫힐 때 호출되는 함수
+    const formattedDates = selectedDates[rowIndex].date.map(date => {
         const dateInstance = date.toDate();
         const year = dateInstance.getFullYear();
         const month = dateInstance.getMonth() + 1;
         const day = dateInstance.getDate();
-        return `${year}-${month}-${day}`; // 월/일 형식으로 변환
+        return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
       })
       .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
-
-    console.log("handleDatePickerClose: ", formattedDates); // 선택된 날짜들 출력
     // 상태를 처리하는 함수 호출
     handleInputChange(rowIndex, 'description', formattedDates);
   };
 
   const handleInputChange = (rowIndex: number, field: keyof Agent, value: string) => {
-    const newData = data.map((row, rIdx) => {
-      if (rIdx === rowIndex) {
-        const updatedRow = { ...row, [field]: value };
-        updatedRow.isNew = true;
-        return updatedRow;
-      }
-      return row;
+    setData(prevData => {
+      const newData = prevData.map((row, rIdx) =>
+        rIdx === rowIndex ? { ...row, [field]: value, isNew: true } : row
+      );
+      return newData; // 최신 데이터 반환
     });
-    setData(newData);
   };
 
   const handleCheckboxChange = (rowIndex: number, checked: boolean) => {
@@ -205,7 +206,7 @@ const Table: React.FC = () => {
                   <DatePicker
                     onChange={(dates: DateObject[]) => handleDateChange(rowIndex, dates)}
                     onClose={() => handleDatePickerClose(rowIndex)}
-                    value={selectedDates[rowIndex]}
+                    value={selectedDates[rowIndex]?.date || []}
                     multiple
                     readOnly={!editableColumns[colIndex]}
                     format="MM/DD"

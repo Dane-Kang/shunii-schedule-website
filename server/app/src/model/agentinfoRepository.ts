@@ -101,7 +101,7 @@ class AgentinfoRepository {
       conn = await db.getConnection();
 
       const query = `
-        SELECT agent_information_id AS id, name, job_level, description FROM agent_informations;`;
+        SELECT agent_information_id AS id, name, job_level, description FROM agent_informations ORDER BY created_at ASC;`;
 
       const [row] = await conn.execute<AgentinfoEntity[]>(query);
 

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS `visitor_comments` (
 
 CREATE TABLE IF NOT EXISTS `agent_informations` (
   `agent_information_id` CHAR(36) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `name` varchar(20) NOT NULL,
   `job_level` varchar(20) NOT NULL,
   `description` varchar(255) NOT NULL,
