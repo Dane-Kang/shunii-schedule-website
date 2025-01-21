@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import useAgent from "./hooks/useAgentinfo";
-//import { useLeaveList } from "./hooks/useAgentinfo";
+import {useAgent} from "./hooks/useAgentinfo";
 import "./App.css";
 
 import MyCalendar from './MyCalendar';
@@ -17,18 +16,16 @@ function App() {
 
   useEffect(() => {
     if(leaveList){
-      console.log('updated leaveList :', leaveList);
+      console.log('Get leaveList :', leaveList);
     }
   }, [leaveList]); // leaveList 변경될 때마다 실행
 
   return (
-    <div className="App">
-
-      <MyCalendar events={leaveList} />
-      <Table />
-      {}
-
-    </div>
+      <div className="App">
+        <MyCalendar events={leaveList} />
+        <Table />
+        {}
+      </div>
   );
 }
 

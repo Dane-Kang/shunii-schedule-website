@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Modal from 'react-modal';
-import useAgent from "./hooks/useAgentinfo";
+import {useAgent} from "./hooks/useAgentinfo";
 import DatePicker from 'react-multi-date-picker';
 import "react-multi-date-picker/styles/layouts/mobile.css";
 import "react-multi-date-picker/styles/colors/green.css";
 import { DateObject } from 'react-multi-date-picker'; // DateObject를 임포트
 import './styles.css';
-import Day from 'react-datepicker/dist/day';
 
 export interface Agent {
   id: string;
@@ -37,7 +36,7 @@ const Table: React.FC = () => {
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null); // 확인 버튼에서 실행할 함수 저장
 
   // 수동으로 열 너비 설정
-  const columnWidths = [60, 160, 300];
+  const columnWidths = [60, 130, 250];
   // Header 이름 설정
   const headerNames = ['이름','직무 등급','원하는 휴일'];
   // 수동으로 열 수정 가능 여부 설정
@@ -119,6 +118,7 @@ const Table: React.FC = () => {
   };
 
   const handleDateChange = (rowIndex: number, dates: DateObject[]) => {
+    console.log("handleDateChange : row " + rowIndex + ", dates " + dates);
     if(!selectedDates[rowIndex]){
       selectedDates[rowIndex] = {name:"", date:[]};
     }
@@ -127,7 +127,7 @@ const Table: React.FC = () => {
   };
 
   const handleDatePickerClose = (rowIndex: number) => { // DatePicker가 닫힐 때 호출되는 함수
-    const formattedDates = selectedDates[rowIndex].date.map(date => {
+    const formattedDates = selectedDates[rowIndex].date.map((date: DateObject) => {
         const dateInstance = date.toDate();
         const year = dateInstance.getFullYear();
         const month = dateInstance.getMonth() + 1;
@@ -202,7 +202,18 @@ const Table: React.FC = () => {
               </td>
               {['name', 'job_level', 'description'].map((field, colIndex) => (
                 <td key={colIndex} style={{ width: `${columnWidths[colIndex]}px` }}>
-                {field === 'description' ? (
+                {field === "job_level" ? (
+                  <select
+                    value={row[field as keyof Agent] as string}
+                    onChange={(e) => handleInputChange(rowIndex, field as keyof Agent, e.target.value)}
+                  >
+                    <option value="">직무를 선택하세요</option>
+                    <option value="점장">점장</option>
+                    <option value="매니저">매니저</option>
+                    <option value="1층 사원">1층 사원</option>
+                    <option value="2층 사원">2층 사원</option>
+                  </select>
+                ) : field === "description" ? (
                   <DatePicker
                     onChange={(dates: DateObject[]) => handleDateChange(rowIndex, dates)}
                     onClose={() => handleDatePickerClose(rowIndex)}

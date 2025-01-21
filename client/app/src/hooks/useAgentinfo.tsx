@@ -3,45 +3,14 @@ import agentAPI from "../apis/agent";
 import { DateObject } from 'react-multi-date-picker'; // DateObject를 임포트
 import { EventInput } from '@fullcalendar/core';
 
-// interface LeaveListContextType {
-//   leaveList: EventInput[];
-//   setLeaveList: React.Dispatch<React.SetStateAction<EventInput[]>>;
-// }
+// Context 생성
+const AgentContext = createContext<any>(null);
 
-// const LeaveListContext = createContext<LeaveListContextType | undefined>(undefined);
-// export const LeaveListProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-//   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
-
-//   return (
-//     <LeaveListContext.Provider value={{ leaveList, setLeaveList }}>
-//       {children}
-//     </LeaveListContext.Provider>
-//   );
-// };
-
-// export const useLeaveList = () => {
-//   const context = useContext(LeaveListContext);
-//   if (!context) {
-//     throw new Error("useLeaveList must be used within a LeaveListProvider");
-//   }
-//   return context;
-// };
-
-
-const useAgent = () => {
+export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [rows, setRows] = useState<number>(0);
   const [agentList, setAgentList] = useState<any[] | undefined>(undefined);
   const [selectedDates, setSelectedDates] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
-  //const { leaveList, setLeaveList } = useLeaveList();
   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
-  // const [description, setDescription] = useState("");
-  // const [name, setName] = useState("");
-  // const [joblevel, setJoblevel] = useState("");
-  // const initializeAgentState = () => {
-  //   setDescription("");
-  //   setName("");
-  //   setJoblevel("");
-  // };
 
   const handleCreateAgent = async (
     name: string, joblevel: string, description: string
@@ -104,7 +73,7 @@ const useAgent = () => {
         const description = agent.description;
         const name = agent.name;
         const serverDates = description.split(',').map((date: string) => date.trim());  // 공백을 제거하고 배열로 변환
-        
+
         const dateObjects = serverDates.map((dateStr: string) => {
           const trimmedDateStr = dateStr.trim(); // 공백 제거
           const [year, month, day] = trimmedDateStr.split('-').map(Number);
@@ -122,6 +91,7 @@ const useAgent = () => {
 
       // setLeaveList 업데이트
       setLeaveList(selectedleaveMapping);
+      console.log("Updated leaveList:", selectedleaveMapping);
       // selectedDates 업데이트
       setSelectedDates(selectedDatesMapping);
     }
@@ -141,17 +111,32 @@ const useAgent = () => {
     setSelectedDateList();
   }, [agentList]);
 
-  return {
-    handleCreateAgent,
-    handleUpdateAgent,
-    handleDeleteAgent,
-    setSelectedDates,
-    setSelectedDateList,
-    agentList,
-    rows,
-    selectedDates,
-    leaveList,
-  };
+  return (
+    <AgentContext.Provider
+      value={{
+        handleCreateAgent,
+        handleUpdateAgent,
+        handleDeleteAgent,
+        rows,
+        agentList,
+        selectedDates,
+        leaveList,
+        setLeaveList,
+        syncAgentList,
+        setSelectedDates,
+        setSelectedDateList,
+      }}
+    >
+      {children}
+    </AgentContext.Provider>
+  );
 };
 
-export default useAgent;
+// Context를 사용하기 위한 커스텀 훅
+export const useAgent = () => {
+  const context = useContext(AgentContext);
+  if (!context) {
+    throw new Error("useAgent must be used within an AgentProvider");
+  }
+  return context;
+};
