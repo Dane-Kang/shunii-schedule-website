@@ -28,6 +28,10 @@ const Table: React.FC = () => {
     handleDeleteAgent,
     setSelectedDates,
     setSelectedDateList,
+    scheduleEssentialWork,
+    scheduleDate,
+    setScheduleEssentialWork,
+    setScheduleDate,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
@@ -37,13 +41,20 @@ const Table: React.FC = () => {
 
   // 수동으로 열 너비 설정
   const columnWidths = [60, 130, 250];
+
+  // 스케줄 관련 너비 , Header 설정
+  const colWidthSetSchedule = [100, 100];
+  const colWidthSetSchedule2 = [100, 150, 150, 150, 150];
+  const headerNamesSetSchedule = ['전체 휴일','대체 휴일'];
+  const headerNamesSetSchedule2 = ['1인당 휴일','필수 근무 인원','필수 매니저↑ 수','필수 1층 사원 수', '필수 2층 사원 수'];
+
   // Header 이름 설정
   const headerNames = ['이름','직무 등급','원하는 휴일'];
   // 수동으로 열 수정 가능 여부 설정
   const editableColumns = [true, true, true, true];
-  
+
   const dataRef = useRef(data);
-  
+
   // agentList를 기반으로 데이터 설정
   useEffect(() => {
     if (agentList) {
@@ -55,6 +66,10 @@ const Table: React.FC = () => {
   useEffect(() => {
     dataRef.current = data;
   }, [data]); // data가 변경될 때마다 실행됨
+
+  useEffect(() => {
+
+  }, [scheduleEssentialWork]); // data가 변경될 때마다 실행됨
 
   // 새로운 행 추가 함수
   const addRow = () => {
@@ -139,12 +154,45 @@ const Table: React.FC = () => {
     handleInputChange(rowIndex, 'description', formattedDates);
   };
 
+  const handlescheduleDateChange = (colIndex: number, dates: DateObject[]) => {
+    if(!scheduleDate[colIndex]){
+      scheduleDate[colIndex] = {name:"", date:[]};
+    }
+    scheduleDate[colIndex].date = dates;
+    setScheduleDate(scheduleDate);
+  };
+
+  const handlescheduleDatePickerClose = (colIndex: number) => { // DatePicker가 닫힐 때 호출되는 함수
+    const formattedDates = scheduleDate[colIndex].date.map((date: DateObject) => {
+        const dateInstance = date.toDate();
+        const year = dateInstance.getFullYear();
+        const month = dateInstance.getMonth() + 1;
+        const day = dateInstance.getDate();
+        return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
+      })
+      .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
+    // 상태를 처리하는 함수 호출
+    //handleInputChange(colIndex, 'description', formattedDates);
+  };
+
   const handleInputChange = (rowIndex: number, field: keyof Agent, value: string) => {
     setData(prevData => {
       const newData = prevData.map((row, rIdx) =>
         rIdx === rowIndex ? { ...row, [field]: value, isNew: true } : row
       );
       return newData; // 최신 데이터 반환
+    });
+  };
+
+  const handlePresetWorkNumberChange = (colIndex: number, value: string) => {
+    const numericValue = parseFloat(value);
+    setScheduleEssentialWork((prev: number[]) => {
+      if (prev[colIndex] !== numericValue) {
+        return prev.map((item, index) =>
+          index === colIndex ? (isNaN(numericValue) ? 0 : numericValue) : item
+        );
+      }
+      return prev;
     });
   };
 
@@ -175,6 +223,57 @@ const Table: React.FC = () => {
   return (
     <div>
       <table className='table-style'>
+        <tr>
+          {colWidthSetSchedule.map((width, colIndex) => (
+            <th key={colIndex} style={{ width: `${width}px` }}>
+              {headerNamesSetSchedule[colIndex]}
+            </th>
+          ))}
+        </tr>
+        <tbody>
+          <tr>
+            {colWidthSetSchedule.map((width, colIndex) => (
+              <td key={colIndex} style={{ width: `${width}px` }}>
+                <DatePicker
+                  onChange={(dates: DateObject[]) => handlescheduleDateChange(colIndex, dates)}
+                  //onClose={() => handlescheduleDatePickerClose(colIndex)}
+                  value={scheduleDate[colIndex]?.date || []}
+                  multiple
+                  readOnly={!editableColumns[colIndex]}
+                  format="MM/DD"
+                  calendarPosition="bottom-center"
+                  className="black"
+                />
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <div style={{ height: "5px" }}></div> {/* 여백 추가 */}
+      <table className='table-style'>
+        <tr>
+          {colWidthSetSchedule2.map((width, colIndex) => (
+            <th key={colIndex} style={{ width: `${width}px` }}>
+              {headerNamesSetSchedule2[colIndex]}
+            </th>
+          ))}
+        </tr>
+        <tbody>
+          <tr>
+            {colWidthSetSchedule2.map((width, colIndex) => (
+              <td key={colIndex} style={{ width: `${width}px` }}>
+                <input
+                  type="text"
+                  value={scheduleEssentialWork[colIndex]}
+                  onChange={(e) => handlePresetWorkNumberChange(colIndex, e.target.value)}
+                />
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <div style={{ height: "30px" }}></div> {/* 여백 추가 */}
+      <table className='table-style'>
         <thead>
           <tr>
             <th>
@@ -202,36 +301,36 @@ const Table: React.FC = () => {
               </td>
               {['name', 'job_level', 'description'].map((field, colIndex) => (
                 <td key={colIndex} style={{ width: `${columnWidths[colIndex]}px` }}>
-                {field === "job_level" ? (
-                  <select
-                    value={row[field as keyof Agent] as string}
-                    onChange={(e) => handleInputChange(rowIndex, field as keyof Agent, e.target.value)}
-                  >
-                    <option value="">직무를 선택하세요</option>
-                    <option value="점장">점장</option>
-                    <option value="매니저">매니저</option>
-                    <option value="1층 사원">1층 사원</option>
-                    <option value="2층 사원">2층 사원</option>
-                  </select>
-                ) : field === "description" ? (
-                  <DatePicker
-                    onChange={(dates: DateObject[]) => handleDateChange(rowIndex, dates)}
-                    onClose={() => handleDatePickerClose(rowIndex)}
-                    value={selectedDates[rowIndex]?.date || []}
-                    multiple
-                    readOnly={!editableColumns[colIndex]}
-                    format="MM/DD"
-                    calendarPosition="bottom-center"
-                    className="black"
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={row[field as keyof Agent] as string}
-                    onChange={(e) => handleInputChange(rowIndex, field as keyof Agent, e.target.value)}
-                    readOnly={!editableColumns[colIndex]}
-                  />
-                )}
+                  {field === "job_level" ? (
+                    <select
+                      value={row[field as keyof Agent] as string}
+                      onChange={(e) => handleInputChange(rowIndex, field as keyof Agent, e.target.value)}
+                    >
+                      <option value="">직무를 선택하세요</option>
+                      <option value="점장">점장</option>
+                      <option value="매니저">매니저</option>
+                      <option value="1층 사원">1층 사원</option>
+                      <option value="2층 사원">2층 사원</option>
+                    </select>
+                  ) : field === "description" ? (
+                    <DatePicker
+                      onChange={(dates: DateObject[]) => handleDateChange(rowIndex, dates)}
+                      onClose={() => handleDatePickerClose(rowIndex)}
+                      value={selectedDates[rowIndex]?.date || []}
+                      multiple
+                      readOnly={!editableColumns[colIndex]}
+                      format="MM/DD"
+                      calendarPosition="bottom-center"
+                      className="black"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={row[field as keyof Agent] as string}
+                      onChange={(e) => handleInputChange(rowIndex, field as keyof Agent, e.target.value)}
+                      readOnly={!editableColumns[colIndex]}
+                    />
+                  )}
                 </td>
               ))}
               {row.isNew && (
@@ -242,7 +341,14 @@ const Table: React.FC = () => {
           ))}
         </tbody>
       </table>
-      <button onClick={addRow}> 추가 </button>
+      <div style={{
+          display: 'flex',
+          marginLeft: '200px',
+          marginTop: '10px', // 버튼 위쪽에 여백 추가
+        }}>
+        <button onClick={addRow}> 추가 </button>
+      </div>
+      <div style={{ height: "40px" }}></div> {/* 여백 추가 */}
 
       <Modal
         isOpen={isModalOpen}

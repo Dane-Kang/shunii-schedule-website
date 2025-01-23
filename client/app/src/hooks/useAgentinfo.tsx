@@ -11,6 +11,8 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [agentList, setAgentList] = useState<any[] | undefined>(undefined);
   const [selectedDates, setSelectedDates] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
+  const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,7,1,4,3]);
+  const [scheduleDate, setScheduleDate] = useState<DateObject[]>([]);
 
   const handleCreateAgent = async (
     name: string, joblevel: string, description: string
@@ -91,7 +93,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
 
       // setLeaveList 업데이트
       setLeaveList(selectedleaveMapping);
-      console.log("Updated leaveList:", selectedleaveMapping);
+      //console.log("Updated leaveList:", selectedleaveMapping);
       // selectedDates 업데이트
       setSelectedDates(selectedDatesMapping);
     }
@@ -121,10 +123,14 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         agentList,
         selectedDates,
         leaveList,
+        scheduleEssentialWork,
+        scheduleDate,
         setLeaveList,
         syncAgentList,
         setSelectedDates,
         setSelectedDateList,
+        setScheduleEssentialWork,
+        setScheduleDate,
       }}
     >
       {children}
