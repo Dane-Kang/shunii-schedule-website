@@ -22,6 +22,7 @@ class Agentinfo {
       name: body.name,
       joblevel: body.joblevel,
       description: body.description,
+      annualleave: body.annualleave,
     };
 
     const commentId = await this.agentinfoRepository.createAgent(
@@ -33,7 +34,7 @@ class Agentinfo {
   }
   
   async updateAgentinfoById(agentinfoId: string): Promise<Response> {
-    const { name, joblevel, description }: AgentinfoDto = this.body;
+    const { name, joblevel, description, annualleave }: AgentinfoDto = this.body;
 
     const agentinfo = await this.agentinfoRepository.getAgentinfoById(
       agentinfoId
@@ -45,7 +46,8 @@ class Agentinfo {
       agentinfoId,
       name,
       joblevel,
-      description
+      description,
+      annualleave
     );
 
     return { success: true, msg: 'Visitor comment update complete' };

@@ -11,6 +11,7 @@ class AgentinfoRepository {
     name,
     joblevel,
     description,
+    annualleave,
   }: AgentinfoDto): Promise<string> {
     let conn;
     try {
@@ -18,13 +19,14 @@ class AgentinfoRepository {
       console.log("enter createAgent");
 
       const query = `
-        INSERT INTO agent_informations (agent_information_id, name, job_level, description) 
-        VALUES (UUID(), ?, ?, ?);`;
+        INSERT INTO agent_informations (agent_information_id, name, job_level, description, annualleave) 
+        VALUES (UUID(), ?, ?, ?, ?);`;
 
       const [row] = await conn.execute<ResultSetHeader>(query, [
         name,
         joblevel,
         description,
+        annualleave,
       ]);
 
       return "true";
@@ -58,18 +60,20 @@ class AgentinfoRepository {
     agentId: string,
     name: string,
     joblevel: string,
-    description: string
+    description: string,
+    annualleave: string
   ): Promise<number> {
     let conn;
     try {
       conn = await db.getConnection();
 
-      const query = `UPDATE agent_informations SET name = ?, job_level = ?, description = ? WHERE agent_information_id = ?`;
+      const query = `UPDATE agent_informations SET name = ?, job_level = ?, description = ?, annualleave = ? WHERE agent_information_id = ?`;
 
       const [row] = await conn.execute<OkPacket>(query, [
         name,
         joblevel,
         description,
+        annualleave,
         agentId,
       ]);
 
@@ -101,7 +105,7 @@ class AgentinfoRepository {
       conn = await db.getConnection();
 
       const query = `
-        SELECT agent_information_id AS id, name, job_level, description FROM agent_informations ORDER BY created_at ASC;`;
+        SELECT agent_information_id AS id, name, job_level, description, annualleave FROM agent_informations ORDER BY created_at ASC;`;
 
       const [row] = await conn.execute<AgentinfoEntity[]>(query);
 

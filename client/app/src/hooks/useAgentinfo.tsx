@@ -10,14 +10,16 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [rows, setRows] = useState<number>(0);
   const [agentList, setAgentList] = useState<any[] | undefined>(undefined);
   const [selectedDates, setSelectedDates] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
+  const [selectedAnnualleave, setSelectedAnnualleave] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
+  const [annualLeaveList, setAnnualLeaveList] = useState<EventInput[]>([]);
   const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,7,1,4,3]);
   const [scheduleDate, setScheduleDate] = useState<DateObject[]>([]);
 
   const handleCreateAgent = async (
-    name: string, joblevel: string, description: string
+    name: string, joblevel: string, description: string, annualleave: string
   ) => {
-    const data = { name, joblevel, description};
+    const data = { name, joblevel, description, annualleave};
     console.log('handleCreateAgent data',data);
     const result = await agentAPI.createAgentinfo(data);
     if (result.statusCode === 400) {
@@ -29,9 +31,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleUpdateAgent = async (id:string,
-    name: string, joblevel: string, description: string
+    name: string, joblevel: string, description: string, annualleave: string
   ) => {
-    const data = { name, joblevel, description};
+    const data = { name, joblevel, description, annualleave};
     console.log('handleUpdateAgent data',data, 'id ',id);
     const result = await agentAPI.updateAgentinfo(id, data);
     if (result.statusCode === 400) {
@@ -43,9 +45,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleDeleteAgent = async (id:string,
-    name: string, joblevel: string, description: string
+    name: string, joblevel: string, description: string, annualleave: string
   ) => {
-    const data = { name, joblevel, description};
+    const data = { name, joblevel, description, annualleave};
     console.log('deleteAgentinfo data',data, 'id ',id);
     
     const result = await agentAPI.deleteAgentinfo(id, data);
@@ -68,34 +70,54 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const setSelectedDateList = async () => {
     const selectedDatesMapping: { [key: number]: {name:string; date:DateObject[]} } = {};
     const selectedleaveMapping:EventInput[] = [];
-    // let rowid: number = 0;
+    const selectedANDatesMapping: { [key: number]: {name:string; date:DateObject[]} } = {};
+    const selectedannualleaveMapping:EventInput[] = [];
+
     if(agentList){
       const filteredinfo = agentList.map(({id, ...rest}) => rest); // id를 제외한 데이터로 변환
       filteredinfo.forEach((agent, rowid) => {
         const description = agent.description;
+        const annualleave = agent.annualleave;
         const name = agent.name;
         const serverDates = description.split(',').map((date: string) => date.trim());  // 공백을 제거하고 배열로 변환
+        const serverANDates = annualleave.split(',').map((date: string) => date.trim());  // 공백을 제거하고 배열로 변환
 
         const dateObjects = serverDates.map((dateStr: string) => {
           const trimmedDateStr = dateStr.trim(); // 공백 제거
           const [year, month, day] = trimmedDateStr.split('-').map(Number);
           return new DateObject({ year, month, day });
         });
-        
         selectedDatesMapping[rowid] = { name, date: dateObjects };
+
+        const dateANObjects = serverANDates.map((dateStr: string) => {
+          const trimmedDateStr = dateStr.trim(); // 공백 제거
+          const [year, month, day] = trimmedDateStr.split('-').map(Number);
+          return new DateObject({ year, month, day });
+        });
+        selectedANDatesMapping[rowid] = { name, date: dateANObjects };
 
         const eventInput:EventInput[] = description.split(',').map((date: string) => {
           return {title:name,start:date.trim()};
         });
-
         selectedleaveMapping.push(...eventInput); //selectedleaveMapping에 eventInput 추가
+
+        const eventANInput:EventInput[] = annualleave.split(',').map((date: string) => {
+          return {title:name,start:date.trim()};
+        });
+        selectedannualleaveMapping.push(...eventANInput); //selectedannualleaveMapping eventInput 추가
       });
 
       // setLeaveList 업데이트
       setLeaveList(selectedleaveMapping);
-      //console.log("Updated leaveList:", selectedleaveMapping);
+
+      // setAnnualLeaveList 업데이트
+      setAnnualLeaveList(selectedannualleaveMapping);
+
       // selectedDates 업데이트
       setSelectedDates(selectedDatesMapping);
+
+      // selectedDates 업데이트
+      setSelectedAnnualleave(selectedANDatesMapping);
     }
   };
 
@@ -122,12 +144,15 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         rows,
         agentList,
         selectedDates,
+        selectedAnnualleave,
         leaveList,
+        annualLeaveList,
         scheduleEssentialWork,
         scheduleDate,
         setLeaveList,
         syncAgentList,
         setSelectedDates,
+        setSelectedAnnualleave,
         setSelectedDateList,
         setScheduleEssentialWork,
         setScheduleDate,

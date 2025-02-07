@@ -4,6 +4,7 @@ export interface AgentinfoDto {
   name: string;
   joblevel: string;
   description: string;
+  annualleave: string;
 }
 
 export interface AgentinfoEntity extends RowDataPacket {
@@ -11,4 +12,5 @@ export interface AgentinfoEntity extends RowDataPacket {
   name: string;
   joblevel: string;
   description: string;
+  annualleave: string;
 }

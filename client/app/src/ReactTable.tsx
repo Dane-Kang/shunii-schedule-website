@@ -12,6 +12,7 @@ export interface Agent {
   name: string;
   job_level: string;
   description: string;
+  annualleave: string;
   isNew?: boolean; // 추가된 행 여부를 나타내는 필드
   ischecked?: boolean;
 }
@@ -23,10 +24,12 @@ const Table: React.FC = () => {
     agentList,
     rows,
     selectedDates,
+    selectedAnnualleave,
     handleCreateAgent,
     handleUpdateAgent,
     handleDeleteAgent,
     setSelectedDates,
+    setSelectedAnnualleave,
     setSelectedDateList,
     scheduleEssentialWork,
     scheduleDate,
@@ -40,7 +43,7 @@ const Table: React.FC = () => {
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null); // 확인 버튼에서 실행할 함수 저장
 
   // 수동으로 열 너비 설정
-  const columnWidths = [60, 130, 250];
+  const columnWidths = [60, 130, 250, 250];
 
   // 스케줄 관련 너비 , Header 설정
   const colWidthSetSchedule = [100, 100];
@@ -49,9 +52,9 @@ const Table: React.FC = () => {
   const headerNamesSetSchedule2 = ['1인당 휴일','필수 근무 인원','필수 매니저↑ 수','필수 1층 사원 수', '필수 2층 사원 수'];
 
   // Header 이름 설정
-  const headerNames = ['이름','직무 등급','원하는 휴일'];
+  const headerNames = ['이름','직무 등급','원하는 휴일', '사용 연차'];
   // 수동으로 열 수정 가능 여부 설정
-  const editableColumns = [true, true, true, true];
+  const editableColumns = [true, true, true, true, true];
 
   const dataRef = useRef(data);
 
@@ -73,7 +76,7 @@ const Table: React.FC = () => {
 
   // 새로운 행 추가 함수
   const addRow = () => {
-    const newRow: Agent = { id: '', name: '', job_level: '', description: ''}; // 기본값을 가진 새 행
+    const newRow: Agent = { id: '', name: '', job_level: '', description: '', annualleave: ''}; // 기본값을 가진 새 행
     setData([...data, newRow]);
   };
 
@@ -110,7 +113,8 @@ const Table: React.FC = () => {
           openModal("Update this info??", () => {
             console.log("dataRef.current :", dataRef.current);
             row.description = dataRef.current[rowIndex].description;
-            handleUpdateAgent(row.id, row.name, row.job_level, row.description); // 확인 후 업데이트
+            row.annualleave = dataRef.current[rowIndex].annualleave;
+            handleUpdateAgent(row.id, row.name, row.job_level, row.description, row.annualleave); // 확인 후 업데이트
           });
           console.log("Update Existing Agent");
         }
@@ -118,14 +122,15 @@ const Table: React.FC = () => {
           openModal("Create New Agent??", () => {
             console.log("dataRef.current :", dataRef.current);
             row.description = dataRef.current[rowIndex].description;
-            handleCreateAgent(row.name, row.job_level, row.description); // 확인 후 업데이트
+            row.annualleave = dataRef.current[rowIndex].annualleave;
+            handleCreateAgent(row.name, row.job_level, row.description, row.annualleave); // 확인 후 업데이트
           });
           console.log("Save New Agent");
         }
       }
       else{
         openModal("Delete??", () => {
-          handleDeleteAgent(row.id, row.name, row.job_level, row.description); // 확인 후 업데이트
+          handleDeleteAgent(row.id, row.name, row.job_level, row.description, row.annualleave); // 확인 후 업데이트
         });
         console.log("Delete Agent");
       }
@@ -133,7 +138,6 @@ const Table: React.FC = () => {
   };
 
   const handleDateChange = (rowIndex: number, dates: DateObject[]) => {
-    console.log("handleDateChange : row " + rowIndex + ", dates " + dates);
     if(!selectedDates[rowIndex]){
       selectedDates[rowIndex] = {name:"", date:[]};
     }
@@ -142,16 +146,42 @@ const Table: React.FC = () => {
   };
 
   const handleDatePickerClose = (rowIndex: number) => { // DatePicker가 닫힐 때 호출되는 함수
-    const formattedDates = selectedDates[rowIndex].date.map((date: DateObject) => {
-        const dateInstance = date.toDate();
-        const year = dateInstance.getFullYear();
-        const month = dateInstance.getMonth() + 1;
-        const day = dateInstance.getDate();
-        return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
-      })
-      .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
-    // 상태를 처리하는 함수 호출
-    handleInputChange(rowIndex, 'description', formattedDates);
+    if(selectedDates[rowIndex]){
+      const formattedDates = selectedDates[rowIndex].date.map((date: DateObject) => {
+          const dateInstance = date.toDate();
+          const year = dateInstance.getFullYear();
+          const month = dateInstance.getMonth() + 1;
+          const day = dateInstance.getDate();
+          return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
+        })
+        .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
+      // 상태를 처리하는 함수 호출
+      handleInputChange(rowIndex, 'description', formattedDates);
+    }
+  };
+
+  const handle_AN_DateChange = (rowIndex: number, dates: DateObject[]) => {
+    console.log("handle_AN_DateChange : row " + rowIndex + ", dates " + dates);
+    if(!selectedAnnualleave[rowIndex]){
+      selectedAnnualleave[rowIndex] = {name:"", date:[]};
+    }
+    selectedAnnualleave[rowIndex].date = dates;
+    setSelectedAnnualleave(selectedAnnualleave);
+  };
+
+  const handle_AN_DatePickerClose = (rowIndex: number) => { // DatePicker가 닫힐 때 호출되는 함수
+    if(selectedAnnualleave[rowIndex]){
+      const formattedDates = selectedAnnualleave[rowIndex].date.map((date: DateObject) => {
+          const dateInstance = date.toDate();
+          const year = dateInstance.getFullYear();
+          const month = dateInstance.getMonth() + 1;
+          const day = dateInstance.getDate();
+          return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
+        })
+        .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
+      // 상태를 처리하는 함수 호출
+      handleInputChange(rowIndex, 'annualleave', formattedDates);
+    }
   };
 
   const handlescheduleDateChange = (colIndex: number, dates: DateObject[]) => {
@@ -299,7 +329,7 @@ const Table: React.FC = () => {
                   onChange={(e) => handleCheckboxChange(rowIndex, e.target.checked)}
                 />
               </td>
-              {['name', 'job_level', 'description'].map((field, colIndex) => (
+              {['name', 'job_level', 'description', 'annualleave'].map((field, colIndex) => (
                 <td key={colIndex} style={{ width: `${columnWidths[colIndex]}px` }}>
                   {field === "job_level" ? (
                     <select
@@ -308,15 +338,29 @@ const Table: React.FC = () => {
                     >
                       <option value="">직무를 선택하세요</option>
                       <option value="점장">점장</option>
-                      <option value="매니저">매니저</option>
+                      <option value="1층 매니저">1층 매니저</option>
+                      <option value="2층 매니저">2층 매니저</option>
                       <option value="1층 사원">1층 사원</option>
                       <option value="2층 사원">2층 사원</option>
                     </select>
                   ) : field === "description" ? (
                     <DatePicker
+                      style={{ width: "250px" }} 
                       onChange={(dates: DateObject[]) => handleDateChange(rowIndex, dates)}
                       onClose={() => handleDatePickerClose(rowIndex)}
                       value={selectedDates[rowIndex]?.date || []}
+                      multiple
+                      readOnly={!editableColumns[colIndex]}
+                      format="MM/DD"
+                      calendarPosition="bottom-center"
+                      className="black"
+                    />
+                  ) : field === "annualleave" ? (
+                    <DatePicker
+                    style={{ width: "250px" }} 
+                      onChange={(dates: DateObject[]) => handle_AN_DateChange(rowIndex, dates)}
+                      onClose={() => handle_AN_DatePickerClose(rowIndex)}
+                      value={selectedAnnualleave[rowIndex]?.date || []}
                       multiple
                       readOnly={!editableColumns[colIndex]}
                       format="MM/DD"

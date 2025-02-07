@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS `agent_informations` (
   `name` varchar(20) NOT NULL,
   `job_level` varchar(20) NOT NULL,
   `description` varchar(255) NOT NULL,
+  `annualleave` varchar(255) NOT NULL,
   PRIMARY KEY (`agent_information_id`)
 );
 

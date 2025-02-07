@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import {useAgent} from "./hooks/useAgentinfo";
+import { useAgent } from "./hooks/useAgentinfo";
 import "./App.css";
-import './styles.css';
+import "./styles.css";
 
-import MyCalendar from './MyCalendar';
-import { EventInput } from '@fullcalendar/core';
-import { DateObject } from 'react-multi-date-picker'; // DateObject를 임포트
-import Table from './ReactTable';
+import MyCalendar from "./MyCalendar";
+import { EventInput } from "@fullcalendar/core";
+import { DateObject } from "react-multi-date-picker"; // DateObject를 임포트
+import Table from "./ReactTable";
+import { execPath } from "process";
 
 export interface Agentinfo {
   name: string;
@@ -20,150 +21,169 @@ function App() {
     scheduleEssentialWork,
     scheduleDate,
     leaveList,
+    annualLeaveList,
   } = useAgent();
 
-  const [agentData, setAgentData] = useState<Agentinfo[]>([]); // Agent[] 타입으로 초기화
-  const [workSchedule, setWorkSchedule] = useState<EventInput[]>([]);
+  const [agentData, setAgentData] = useState<Agentinfo[]>([]);
+  const [leaveSchedule, setLeaveSchedule] = useState<EventInput[]>([]);
+  const [leaveCount, setLeaveCount] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
-    if(leaveList){
-      console.log('Get leaveList :', leaveList);
-    }
-    // leavelist data example 
-    // 0: {title: '미래', start: '2025-01-07'}
-    // 1: {title: '미래', start: '2025-01-21'}
-    if(agentList){
+    if (agentList) {
       setAgentData(agentList);
-      console.log('agentData ', agentData);
     }
-  }, [leaveList, agentList]); // leaveList 변경될 때마다 실행
+  }, [agentList]);
 
-  const generateWorkSchedule = () => {
-    if (!agentData || agentData.length === 0) return;
+  const generateLeaveSchedule = () => {
+    if (!agentData || agentData.length === 0 || !scheduleEssentialWork || scheduleEssentialWork.length < 5) return;
 
-    const totalEmployees = agentData.length;
-    console.log('totalEmployees',totalEmployees);
-    const daysInMonth = 31; // Assume 31 days in the current month
+    const daysInMonth = 28; // 달의 총 일수 (현재 31일 기준으로 설정)
+    const maxLeavesPerEmployee = scheduleEssentialWork[0]; // 직원당 최대 휴무 일수
+    const minDailyEmployees = scheduleEssentialWork[1]; // 하루 최소 근무 인원
+    const minManagers = scheduleEssentialWork[2]; // 하루 최소 매니저 이상 근무 인원
+    const minFirstFloor = scheduleEssentialWork[3]; // 하루 최소 1층 근무 직원
+    const minSecondFloor = scheduleEssentialWork[4]; // 하루 최소 2층 근무 직원
+    const minWorkGap = 3; // 최소 연속 근무 일수 (휴무 후 최소 3일 이상 근무하도록 설정)
 
     const result: EventInput[] = [];
 
-    // Create a map for employee-specific schedules
-    const employeeSchedule: { [key: string]: string[] } = {};
-
-    // Initialize employee schedules
+    const employeeSchedule: { [key: string]: string[] } = {}; // 직원별 휴무 일정 저장
+    const leaveCounter: { [key: string]: number } = {}; // 직원별 현재까지의 휴무 횟수 저장
+    const lastLeaveDay: { [key: string]: number } = {};  // 직원별 마지막 휴무일 추적 (연속 근무 조건 확인용)
+    
     agentData.forEach((employee) => {
       employeeSchedule[employee.name] = [];
+      leaveCounter[employee.name] = 0;
+      lastLeaveDay[employee.name] = -minWorkGap; // 초기값 설정 (최소 근무 일수 보장)
     });
 
-    // Parse leaveList for preferred holidays
+    // 1. leaveList에 있는 사전 설정된 휴무를 먼저 반영
+    const allLeaves: { name: string; date: string; day: number }[] = [];
     leaveList.forEach(({ title, start }: EventInput) => {
       if (title && start && employeeSchedule[title]) {
-        employeeSchedule[title].push(start.toString());
+        const date = start.toString();
+        const day = parseInt(date.split("-")[2]);
+        if (!employeeSchedule[title].includes(date)) {
+          employeeSchedule[title].push(date);
+          leaveCounter[title] += 1;
+          allLeaves.push({ name: title, date, day });
+        }
       }
     });
-    
-    // Helper to check if a specific role requirement is met
-    const checkRoleRequirement = (daySchedule: string[]) => {
-      const roles = agentData.filter((emp) => daySchedule.includes(emp.name)).map((emp) => emp.job_level);
-      const managerOrAbove = roles.filter((role) => role === "점장" || role === "매니저").length;
-      const firstFloor = roles.filter((role) => role === "1층 사원").length;
-      const secondFloor = roles.filter((role) => role === "2층 사원").length;
 
-      return managerOrAbove >= 1 && firstFloor >= 4 && secondFloor >= 3;
-    };
-    console.log('4');
-    
-    // Generate work schedule for each day
+    // 1-1. annualLeaveList에 있는 연차 휴무 반영
+    annualLeaveList.forEach(({ title, start }: EventInput) => {
+      if (title && start && employeeSchedule[title]) {
+        const date = start.toString();
+        const day = parseInt(date.split("-")[2]);
+        if (!employeeSchedule[title].includes(date)) {
+          employeeSchedule[title].push(date);
+          allLeaves.push({ name: title, date, day });
+        }
+      }
+    });
+
+    // 2. 랜덤 휴무 추가 (근무 간격 및 조건 고려)
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = `2025-01-${day.toString().padStart(2, "0")}`;
-      console.log(date);
-
-      // Skip if it's a scheduled holiday
-      if (scheduleDate.some((d: DateObject) => d.toDate().toISOString().split("T")[0] === date)) {
+      const date = `2025-02-${day.toString().padStart(2, "0")}`;
+      console.log('date : ',date);
+      
+      // 전체 휴무일이 있는 경우 스킵
+      if (scheduleDate && scheduleDate.some((d: DateObject) => d.toDate().toISOString().split("T")[0] === date)) {
         continue;
       }
 
-      let daySchedule: string[] = [];
+      // 모든 날의 사전 설정된 휴무가 있으면 lastLeaveDay 반영
+      agentData.forEach((employee) => {
+        employeeSchedule[employee.name].forEach((tmp_date) => {
+          if(day === parseInt(tmp_date.split("-")[2])){
+            lastLeaveDay[employee.name] = day;
+            console.log('lastLeaveDay name : ',employee.name);
+          }
+        });
+      });
+      
+      // 휴무 후보군 선정 (최대 휴무 초과 X, 최소 연속 근무 충족 O, 이미 사전 설정된 휴무 직원 제외)
+      let remainingEmployees = agentData.filter(emp =>
+        emp.job_level !== "점장" &&
+        leaveCounter[emp.name] < maxLeavesPerEmployee &&
+        (day - lastLeaveDay[emp.name] > minWorkGap) &&
+        !employeeSchedule[emp.name].includes(date) // 이미 사전 설정된 휴무 제외
+      );
+      console.log('remainingEmployees : ');
+      remainingEmployees.forEach(emp => console.log(emp.name));
 
-      console.log('51');
-      // Fill daySchedule with employees
-      // // 문제가 있음. 여기서 checkRoleRequirement()이 계속 false면 무한루프 돔.
-      while (daySchedule.length < 7 || !checkRoleRequirement(daySchedule)) {
-        const randomEmployee = agentData[Math.floor(Math.random() * totalEmployees)];
-        // Skip if the employee is already scheduled or it's their holiday
+      let offDutyEmployees: string[] = [];
+
+      // 점장은 사전 설정된 휴무일이 아니면 근무하는 것으로 설정정
+      let dailyWorkforce = agentData.filter(emp => 
+        (emp.job_level === "점장" && !employeeSchedule[emp.name].includes(date)) || 
+        !employeeSchedule[emp.name].includes(date)
+      );
+
+      while (offDutyEmployees.length < 5 && remainingEmployees.length > 0) {
+        const randomIndex = Math.floor(Math.abs(Math.sin(Date.now()) * 10000) % remainingEmployees.length);
+        const randomEmployee = remainingEmployees[randomIndex];
+
+        offDutyEmployees.push(randomEmployee.name);
+
+        let tempWorkforce = dailyWorkforce.filter(emp => !offDutyEmployees.includes(emp.name));
+        let managers = tempWorkforce.filter(emp => emp.job_level === "점장" || emp.job_level === "1층 매니저" || emp.job_level === "2층 매니저").length;
+        let firstFloor = tempWorkforce.filter(emp => emp.job_level === "1층 사원" || emp.job_level === "1층 매니저").length;
+        let secondFloor = tempWorkforce.filter(emp => emp.job_level === "2층 사원" || emp.job_level === "2층 매니저").length;
+        
+        // 필수 근무 조건 체크
         if (
-          daySchedule.includes(randomEmployee.name) ||
-          employeeSchedule[randomEmployee.name].includes(date)
+          tempWorkforce.length < minDailyEmployees ||
+          managers < minManagers ||
+          firstFloor < minFirstFloor ||
+          secondFloor < minSecondFloor
         ) {
+          console.log('##### condition check failed ', randomEmployee.name);
+          console.log('tempWorkforce.length : ',tempWorkforce.length);
+          console.log('managers : ',managers, 'firstFloor : ',firstFloor, 'secondFloor : ',secondFloor);
+          offDutyEmployees.pop();
+          remainingEmployees.splice(randomIndex, 1);
           continue;
         }
-        daySchedule.push(randomEmployee.name);
-        console.log(daySchedule);
+
+        leaveCounter[randomEmployee.name] += 1;
+        lastLeaveDay[randomEmployee.name] = day;
+        employeeSchedule[randomEmployee.name].push(date);
+        allLeaves.push({ name: randomEmployee.name, date, day });
+        remainingEmployees.splice(randomIndex, 1);
       }
-      console.log('52');
-      // // Add the schedule for this day
-      // daySchedule.forEach((employee) => {
-      //   result.push({ title: `${employee} (근무)`, start: date });
-      // });
-
-      // Calculate off-duty employees
-      const offDutyEmployees = agentData
-        .map((emp) => emp.name)
-        .filter((name) => !daySchedule.includes(name));
-
-      // Add off-duty employees to the result
-      offDutyEmployees.forEach((employee) => {
-        result.push({ title: `${employee} (휴무)`, start: date });
-      });
     }
-    console.log('6');
-    
-    // Assign remaining random holidays to employees
-    agentData.forEach((employee) => {
-      const scheduledDays = result
-        .filter((entry) => entry.title && entry.title.includes(employee.name) && entry.title.includes("(근무)"))
-        .map((entry) => entry.start);
 
-      const holidays = scheduleDate ? scheduleDate.map((d: DateObject) => d.toDate().toISOString().split("T")[0]) : [];
-
-      let remainingHolidays = 8 - employeeSchedule[employee.name].length;
-      console.log('7');
-      while (remainingHolidays > 0) {
-        const randomDay = `2025-01-${Math.floor(Math.random() * daysInMonth + 1).toString().padStart(2, "0")}`;
-
-        if (
-          !scheduledDays.includes(randomDay) &&
-          !employeeSchedule[employee.name].includes(randomDay) &&
-          !holidays.includes(randomDay)
-        ) {
-          employeeSchedule[employee.name].push(randomDay);
-          remainingHolidays--;
-        }
+    // 3. 날짜순으로 정렬 후 휴무 카운트 증가
+    allLeaves.sort((a, b) => a.day - b.day);
+    const tempLeaveCounter: { [key: string]: number } = {};
+    allLeaves.forEach(({ name, date }) => {
+      if (!tempLeaveCounter[name]) {
+        tempLeaveCounter[name] = 0;
       }
-      console.log('8');
+      tempLeaveCounter[name] += 1;
+      result.push({ title: `${name} (${tempLeaveCounter[name]}일)`, start: date });
     });
+    console.log('tempLeaveCounter : ',tempLeaveCounter);
 
-    setWorkSchedule(result);
+    setLeaveSchedule(result);
+    setLeaveCount(tempLeaveCounter);
   };
-  //
+
   const genSch = () => {
-    generateWorkSchedule();
+    generateLeaveSchedule();
   };
-  
+
   return (
     <div className="App">
-      <MyCalendar events={leaveList} />
-      <div style={{ height: "10px" }}></div> {/* 여백 추가 */}
-      <div style={{
-          display: 'flex',
-          marginLeft: '400px',
-          marginTop: '10px', // 버튼 위쪽에 여백 추가
-        }}>
+      <MyCalendar events={leaveSchedule} />
+      <div style={{ height: "10px" }}></div>
+      <div style={{ display: 'flex', marginLeft: '400px', marginTop: '10px' }}>
         <button onClick={genSch}> Generate </button>
       </div>
-      <div style={{ height: "10px" }}></div> {/* 여백 추가 */}
+      <div style={{ height: "10px" }}></div>
       <Table />
-      {}
     </div>
   );
 }
