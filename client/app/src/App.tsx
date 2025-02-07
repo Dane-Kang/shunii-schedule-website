@@ -122,7 +122,7 @@ function App() {
       );
 
       while (offDutyEmployees.length < 5 && remainingEmployees.length > 0) {
-        const randomIndex = Math.floor(Math.abs(Math.sin(Date.now()) * 10000) % remainingEmployees.length);
+        const randomIndex = ((Math.random() * 100000) | 0) % remainingEmployees.length;
         const randomEmployee = remainingEmployees[randomIndex];
 
         offDutyEmployees.push(randomEmployee.name);
@@ -155,6 +155,51 @@ function App() {
       }
     }
 
+    agentData.forEach((employee) => {
+      console.log('추가 확인 employee.name : ',employee.name, '사용 휴무 ', leaveCounter[employee.name]);
+      while (leaveCounter[employee.name] < maxLeavesPerEmployee) {
+        if(employee.job_level === "점장") 
+          break;
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = `2025-02-${day.toString().padStart(2, "0")}`;
+          const lowLeaveDays = allLeaves.filter(l => l.day === day).length;
+          if (!employeeSchedule[employee.name].includes(date) && lowLeaveDays < 3) {
+            if(leaveCounter[employee.name] < maxLeavesPerEmployee) {
+              console.log(date,'현재 휴가인원 ', lowLeaveDays, '추가 - ',employee.name);
+              employeeSchedule[employee.name].push(date);
+              leaveCounter[employee.name] += 1;
+              allLeaves.push({ name: employee.name, date, day });
+              continue;
+            }
+          }
+        }
+
+        if(leaveCounter[employee.name] < maxLeavesPerEmployee) {
+          let count = 0;
+          while(count < 100){
+            let day = ((Math.random() * 100000) | 0) % daysInMonth;
+            if(day === 0) continue;
+            const date = `2025-02-${day.toString().padStart(2, "0")}`;
+            console.log(date);
+            const lowLeaveDays = allLeaves.filter(l => l.day === day).length;
+            if (!employeeSchedule[employee.name].includes(date) && lowLeaveDays < 4) {
+              if(leaveCounter[employee.name] < maxLeavesPerEmployee) {
+                console.log(date,'현재 휴가인원 ', lowLeaveDays, '추가 - ',employee.name);
+                employeeSchedule[employee.name].push(date);
+                leaveCounter[employee.name] += 1;
+                allLeaves.push({ name: employee.name, date, day });
+              }
+              else
+                break;
+            }
+            count++;
+          }
+        }
+        break;
+      }
+    });
+    console.log('after leaveCounter : ',leaveCounter);
+
     // 3. 날짜순으로 정렬 후 휴무 카운트 증가
     allLeaves.sort((a, b) => a.day - b.day);
     const tempLeaveCounter: { [key: string]: number } = {};
@@ -165,7 +210,8 @@ function App() {
       tempLeaveCounter[name] += 1;
       result.push({ title: `${name} (${tempLeaveCounter[name]}일)`, start: date });
     });
-    console.log('tempLeaveCounter : ',tempLeaveCounter);
+
+    console.log('After tempLeaveCounter : ',tempLeaveCounter);
 
     setLeaveSchedule(result);
     setLeaveCount(tempLeaveCounter);
