@@ -33,8 +33,10 @@ const Table: React.FC = () => {
     setSelectedDateList,
     scheduleEssentialWork,
     scheduleDate,
+    selectedSubjob,
     setScheduleEssentialWork,
     setScheduleDate,
+    setSelectedSubjob,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
@@ -50,6 +52,10 @@ const Table: React.FC = () => {
   const colWidthSetSchedule2 = [100, 150, 150, 150, 150];
   const headerNamesSetSchedule = ['전체 휴일','대체 휴일'];
   const headerNamesSetSchedule2 = ['1인당 휴일','필수 근무 인원','필수 매니저↑ 수','필수 1층 사원 수', '필수 2층 사원 수'];
+  
+  const colWidthHeaderSubjobs = [160, 160];
+  const colWidthSubjobs = [80, 80, 80, 80];
+  const headerNamesSubjobs = ['온라인 업무','RT 업무'];
 
   // Header 이름 설정
   const headerNames = ['이름','직무 등급','원하는 휴일', '사용 연차'];
@@ -214,6 +220,11 @@ const Table: React.FC = () => {
     });
   };
 
+  const handleSubjobChange = (colIndex: number, value: string) => {
+    selectedSubjob[colIndex] = value;
+    setSelectedSubjob(selectedSubjob);
+  };
+
   const handlePresetWorkNumberChange = (colIndex: number, value: string) => {
     const numericValue = parseFloat(value);
     setScheduleEssentialWork((prev: number[]) => {
@@ -304,6 +315,32 @@ const Table: React.FC = () => {
       </table>
       <div style={{ height: "30px" }}></div> {/* 여백 추가 */}
       <table className='table-style'>
+        <tr>
+          {colWidthHeaderSubjobs.map((width, colIndex) => (
+            <th key={colIndex} colSpan={2} style={{ width: `${width}px` }}>
+              {headerNamesSubjobs[colIndex]}
+            </th>
+          ))}
+        </tr>
+        <tbody>
+          <tr>
+            {colWidthSubjobs.map((width, colIndex) => (
+              <td key={colIndex} style={{ width: `${width}px` }}>
+                <select
+                  value={selectedSubjob[colIndex]}
+                  onChange={(e) => handleSubjobChange(colIndex, e.target.value)}>
+                  <option value="">직원 선택</option>
+                  {data.map((peoples: Agent) => (
+                    <option value ={peoples.name}>{peoples.name}</option>
+                  ))}
+                </select>
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <div style={{ height: "30px" }}></div> {/* 여백 추가 */}
+      <table className='table-style'>
         <thead>
           <tr>
             <th>
@@ -340,6 +377,9 @@ const Table: React.FC = () => {
                       <option value="점장">점장</option>
                       <option value="1층 매니저">1층 매니저</option>
                       <option value="2층 매니저">2층 매니저</option>
+                      <option value="2층 부점장">2층 부점장</option>
+                      <option value="1층 대리">1층 대리</option>
+                      <option value="2층 대리">2층 대리</option>
                       <option value="1층 사원">1층 사원</option>
                       <option value="2층 사원">2층 사원</option>
                     </select>
