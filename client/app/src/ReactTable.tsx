@@ -33,10 +33,12 @@ const Table: React.FC = () => {
     setSelectedDateList,
     scheduleEssentialWork,
     scheduleDate,
-    selectedSubjob,
+    selectedSubjob1,
+    selectedSubjob2,
     setScheduleEssentialWork,
     setScheduleDate,
-    setSelectedSubjob,
+    setSelectedSubjob1,
+    setSelectedSubjob2,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
@@ -51,7 +53,7 @@ const Table: React.FC = () => {
   const colWidthSetSchedule = [100, 100];
   const colWidthSetSchedule2 = [100, 150, 150, 150, 150];
   const headerNamesSetSchedule = ['전체 휴일','대체 휴일'];
-  const headerNamesSetSchedule2 = ['1인당 휴일','필수 근무 인원','필수 매니저↑ 수','필수 1층 사원 수', '필수 2층 사원 수'];
+  const headerNamesSetSchedule2 = ['1인당 휴일','최소 근무 인원','필수 매니저↑ 수','필수 1층 사원 수', '필수 2층 사원 수'];
   
   const colWidthHeaderSubjobs = [160, 160];
   const colWidthSubjobs = [80, 80, 80, 80];
@@ -220,9 +222,14 @@ const Table: React.FC = () => {
     });
   };
 
-  const handleSubjobChange = (colIndex: number, value: string) => {
-    selectedSubjob[colIndex] = value;
-    setSelectedSubjob(selectedSubjob);
+  const handleSubjob1Change = (colIndex: number, value: string) => {
+    selectedSubjob1[colIndex] = value;
+    setSelectedSubjob1(selectedSubjob1);
+  };
+
+  const handleSubjob2Change = (colIndex: number, value: string) => {
+    selectedSubjob2[colIndex] = value;
+    setSelectedSubjob2(selectedSubjob2);
   };
 
   const handlePresetWorkNumberChange = (colIndex: number, value: string) => {
@@ -327,8 +334,8 @@ const Table: React.FC = () => {
             {colWidthSubjobs.map((width, colIndex) => (
               <td key={colIndex} style={{ width: `${width}px` }}>
                 <select
-                  value={selectedSubjob[colIndex]}
-                  onChange={(e) => handleSubjobChange(colIndex, e.target.value)}>
+                  value={colIndex < 2 ? selectedSubjob1[colIndex] : selectedSubjob2[colIndex - 2]}
+                  onChange={(e) => colIndex < 2 ? handleSubjob1Change(colIndex, e.target.value) : handleSubjob2Change(colIndex - 2, e.target.value)}>
                   <option value="">직원 선택</option>
                   {data.map((peoples: Agent) => (
                     <option value ={peoples.name}>{peoples.name}</option>
