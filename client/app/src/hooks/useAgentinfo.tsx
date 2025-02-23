@@ -14,7 +14,8 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
   const [annualLeaveList, setAnnualLeaveList] = useState<EventInput[]>([]);
   const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,7,1,4,3]);
-  const [scheduleDate, setScheduleDate] = useState<DateObject[]>([]);
+  const [holiday, setHoliday] = useState<DateObject[]>([]);
+  const [alternativeholiday, setAlternativeholiday] = useState<DateObject[]>([]);
   const [selectedSubjob1, setSelectedSubjob1] = useState<string[]>([]);
   const [selectedSubjob2, setSelectedSubjob2] = useState<string[]>([]);
 
@@ -150,7 +151,8 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         leaveList,
         annualLeaveList,
         scheduleEssentialWork,
-        scheduleDate,
+        holiday,
+        alternativeholiday,
         selectedSubjob1,
         selectedSubjob2,
         setLeaveList,
@@ -159,7 +161,8 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         setSelectedAnnualleave,
         setSelectedDateList,
         setScheduleEssentialWork,
-        setScheduleDate,
+        setHoliday,
+        setAlternativeholiday,
         setSelectedSubjob1,
         setSelectedSubjob2,
       }}

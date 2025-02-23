@@ -32,11 +32,13 @@ const Table: React.FC = () => {
     setSelectedAnnualleave,
     setSelectedDateList,
     scheduleEssentialWork,
-    scheduleDate,
+    holiday,
+    alternativeholiday,
     selectedSubjob1,
     selectedSubjob2,
     setScheduleEssentialWork,
-    setScheduleDate,
+    setHoliday,
+    setAlternativeholiday,
     setSelectedSubjob1,
     setSelectedSubjob2,
   } = useAgent();
@@ -163,6 +165,8 @@ const Table: React.FC = () => {
           return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
         })
         .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
+      // 잘못된 것이 들어있으면 return
+      if(formattedDates.includes("NaN")) return;
       // 상태를 처리하는 함수 호출
       handleInputChange(rowIndex, 'description', formattedDates);
     }
@@ -187,30 +191,25 @@ const Table: React.FC = () => {
           return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
         })
         .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
+      // 잘못된 것이 들어있으면 return
+      if(formattedDates.includes("NaN")) return;
       // 상태를 처리하는 함수 호출
       handleInputChange(rowIndex, 'annualleave', formattedDates);
     }
   };
 
-  const handlescheduleDateChange = (colIndex: number, dates: DateObject[]) => {
-    if(!scheduleDate[colIndex]){
-      scheduleDate[colIndex] = {name:"", date:[]};
-    }
-    scheduleDate[colIndex].date = dates;
-    setScheduleDate(scheduleDate);
+  const handlehoidayChange = (dates: DateObject[]) => {
+    console.log('holiday ',dates);
+    setHoliday(dates);
+  };
+
+  const handlealternativeholidayChange = (dates: DateObject[]) => {
+    console.log('alternativeholiday ',dates);
+    setAlternativeholiday(dates);
   };
 
   const handlescheduleDatePickerClose = (colIndex: number) => { // DatePicker가 닫힐 때 호출되는 함수
-    const formattedDates = scheduleDate[colIndex].date.map((date: DateObject) => {
-        const dateInstance = date.toDate();
-        const year = dateInstance.getFullYear();
-        const month = dateInstance.getMonth() + 1;
-        const day = dateInstance.getDate();
-        return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0"); // 월/일 형식으로 변환
-      })
-      .join(", "); // 여러 날짜들을 쉼표로 구분하여 연결
-    // 상태를 처리하는 함수 호출
-    //handleInputChange(colIndex, 'description', formattedDates);
+    
   };
 
   const handleInputChange = (rowIndex: number, field: keyof Agent, value: string) => {
@@ -283,9 +282,8 @@ const Table: React.FC = () => {
             {colWidthSetSchedule.map((width, colIndex) => (
               <td key={colIndex} style={{ width: `${width}px` }}>
                 <DatePicker
-                  onChange={(dates: DateObject[]) => handlescheduleDateChange(colIndex, dates)}
-                  //onClose={() => handlescheduleDatePickerClose(colIndex)}
-                  value={scheduleDate[colIndex]?.date || []}
+                  onChange={(dates: DateObject[]) => colIndex < 1 ? handlehoidayChange(dates): handlealternativeholidayChange(dates)}
+                  value={colIndex < 1 ? holiday : alternativeholiday}
                   multiple
                   readOnly={!editableColumns[colIndex]}
                   format="MM/DD"
