@@ -13,11 +13,13 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [selectedAnnualleave, setSelectedAnnualleave] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
   const [annualLeaveList, setAnnualLeaveList] = useState<EventInput[]>([]);
-  const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,7,1,4,3]);
+  const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,7,1,3,3]);
   const [holiday, setHoliday] = useState<DateObject[]>([]);
   const [alternativeholiday, setAlternativeholiday] = useState<DateObject[]>([]);
   const [selectedSubjob1, setSelectedSubjob1] = useState<string[]>([]);
   const [selectedSubjob2, setSelectedSubjob2] = useState<string[]>([]);
+  const [currentMonth, setCurrentMonth] = useState<string>(""); // 초기값 현재 달
+  const [annualLeaveUsage, setAnnualLeaveUsage] = useState<{ [agentId: string]: number }>({}); // 인원별 누적 사용 연차
 
   const handleCreateAgent = async (
     name: string, joblevel: string, description: string, annualleave: string
@@ -68,6 +70,32 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     setAgentList(result.agentinfos);
     const count = await agentAPI.getAgentCount();
     setRows(count.response);
+  };
+
+  // 특정 연도의 인원별 누적 사용 연차 수를 서버에서 조회
+  const fetchAnnualLeaveUsage = async (year: string) => {
+    if (!/^\d{4}$/.test(year)) return;
+    try {
+      const result = await agentAPI.getAnnualLeaveUsage(year);
+      setAnnualLeaveUsage(result?.usage ?? {});
+    } catch (err) {
+      console.error("fetchAnnualLeaveUsage error", err);
+    }
+  };
+
+  // 확정된 월 스케줄을 서버에 저장 (인원 x 월 별 덮어쓰기)
+  const confirmSchedule = async (
+    scheduleMonth: string,
+    entries: { agentId: string; leaveDates: string[]; annualLeaveDates: string[] }[]
+  ) => {
+    const result = await agentAPI.confirmMonthlySchedule({ scheduleMonth, entries });
+    if (result?.statusCode && result.statusCode !== 200) {
+      alert(result.msg ?? "스케줄 확정에 실패했습니다.");
+      return false;
+    }
+    // 저장 후 해당 연도 누적 연차 갱신
+    await fetchAnnualLeaveUsage(scheduleMonth.split("-")[0]);
+    return true;
   };
 
   const setSelectedDateList = async () => {
@@ -138,6 +166,13 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     setSelectedDateList();
   }, [agentList]);
 
+  // 달력에서 보고 있는 달이 바뀌면 해당 연도의 누적 사용 연차를 다시 조회
+  useEffect(() => {
+    if (currentMonth && /^\d{4}-\d{2}$/.test(currentMonth)) {
+      fetchAnnualLeaveUsage(currentMonth.split("-")[0]);
+    }
+  }, [currentMonth]);
+
   return (
     <AgentContext.Provider
       value={{
@@ -155,6 +190,10 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         alternativeholiday,
         selectedSubjob1,
         selectedSubjob2,
+        currentMonth,
+        annualLeaveUsage,
+        fetchAnnualLeaveUsage,
+        confirmSchedule,
         setLeaveList,
         syncAgentList,
         setSelectedDates,
@@ -165,6 +204,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         setAlternativeholiday,
         setSelectedSubjob1,
         setSelectedSubjob2,
+        setCurrentMonth,
       }}
     >
       {children}

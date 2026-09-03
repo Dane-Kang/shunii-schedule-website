@@ -29,4 +29,17 @@ CREATE TABLE IF NOT EXISTS `agent_informations` (
   PRIMARY KEY (`agent_information_id`)
 );
 
+-- 월 단위로 확정된 스케줄 (인원 x 월 별 한 행, 재확정 시 덮어씀)
+CREATE TABLE IF NOT EXISTS `monthly_schedules` (
+  `monthly_schedule_id` CHAR(36) NOT NULL,
+  `agent_information_id` CHAR(36) NOT NULL,
+  `schedule_month` CHAR(7) NOT NULL,                       -- 'YYYY-MM'
+  `leave_dates` VARCHAR(500) NOT NULL DEFAULT '',          -- 콤마 구분 'YYYY-MM-DD' (확정된 전체 휴무)
+  `annual_leave_dates` VARCHAR(500) NOT NULL DEFAULT '',   -- 콤마 구분 'YYYY-MM-DD' (해당 월 연차일)
+  `annual_leave_count` INT NOT NULL DEFAULT 0,             -- 해당 월 사용 연차 수
+  `confirmed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`monthly_schedule_id`),
+  UNIQUE KEY `uq_agent_month` (`agent_information_id`, `schedule_month`)
+);
+
 INSERT INTO number_of_visitors (total_count, today_count) VALUES (0, 0);

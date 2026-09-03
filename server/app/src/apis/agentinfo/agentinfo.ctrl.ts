@@ -71,6 +71,33 @@ const getAgentinfos = async (req: Request, res: Response) => {
   }
 };
 
+const confirmMonthlySchedule = async (req: Request, res: Response) => {
+  try {
+    console.log('Enter confirmMonthlySchedule');
+    const agentinfo = new Agentinfo(new AgentinfoRepository());
+
+    const response = await agentinfo.confirmMonthlySchedule(req.body);
+
+    return res.status(200).json({ statusCode: 200, ...response });
+  } catch (err) {
+    return errorResposne(err, res);
+  }
+};
+
+const getAnnualLeaveUsage = async (req: Request, res: Response) => {
+  try {
+    console.log('Enter getAnnualLeaveUsage');
+    const year = String(req.query.year ?? '');
+    const agentinfo = new Agentinfo(new AgentinfoRepository());
+
+    const response = await agentinfo.getAnnualLeaveUsage(year);
+
+    return res.status(200).json({ statusCode: 200, ...response });
+  } catch (err) {
+    return errorResposne(err, res);
+  }
+};
+
 const deleteAgentinfoById = async (req: Request, res: Response) => {
   try {
     console.log('Enter deleteAgentinfoById');
@@ -100,4 +127,6 @@ export = {
   getAgentCount,
   getAgentinfos,
   deleteAgentinfoById,
+  confirmMonthlySchedule,
+  getAnnualLeaveUsage,
 };

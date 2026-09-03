@@ -41,6 +41,7 @@ const Table: React.FC = () => {
     setAlternativeholiday,
     setSelectedSubjob1,
     setSelectedSubjob2,
+    annualLeaveUsage,
   } = useAgent();
 
   const [data, setData] = useState<Agent[]>([]); // Agent[] 타입으로 초기화
@@ -49,7 +50,7 @@ const Table: React.FC = () => {
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null); // 확인 버튼에서 실행할 함수 저장
 
   // 수동으로 열 너비 설정
-  const columnWidths = [60, 130, 250, 250];
+  const columnWidths = [60, 130, 250, 250, 110];
 
   // 스케줄 관련 너비 , Header 설정
   const colWidthSetSchedule = [100, 100];
@@ -62,9 +63,9 @@ const Table: React.FC = () => {
   const headerNamesSubjobs = ['온라인 업무','RT 업무'];
 
   // Header 이름 설정
-  const headerNames = ['이름','직무 등급','원하는 휴일', '사용 연차'];
-  // 수동으로 열 수정 가능 여부 설정
-  const editableColumns = [true, true, true, true, true];
+  const headerNames = ['이름','직무 등급','원하는 휴일', '연차 신청', '누적 사용 연차'];
+  // 수동으로 열 수정 가능 여부 설정 (마지막 '누적 사용 연차'는 읽기 전용)
+  const editableColumns = [true, true, true, true, false];
 
   const dataRef = useRef(data);
 
@@ -422,6 +423,9 @@ const Table: React.FC = () => {
                   )}
                 </td>
               ))}
+              <td style={{ width: `${columnWidths[4]}px`, textAlign: 'center' }}>
+                {(annualLeaveUsage && annualLeaveUsage[row.id]) || 0}
+              </td>
               {row.isNew && (
                 <button onClick={() => setRowEvent(row, rowIndex)}>
                     {row.ischecked ? 'Delete' : 'Save'}</button>

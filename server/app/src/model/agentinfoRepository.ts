@@ -1,6 +1,6 @@
 import { OkPacket, ResultSetHeader, RowDataPacket } from 'mysql2';
 import {
-  AgentinfoEntity, AgentinfoDto,
+  AgentinfoEntity, AgentinfoDto, MonthlyScheduleDto, AnnualLeaveUsageEntity,
 } from '../apis/agentinfo/agentinfo';
 import db from '../config/db';
 import { ServerError } from '../service/error';
@@ -127,6 +127,69 @@ class AgentinfoRepository {
       return row.affectedRows;
     } catch (error) {
       throw new ServerError('Database Error Occurred');
+    } finally {
+      conn?.release();
+    }
+  }
+
+  // 인원 x 월 별 한 행 upsert (재확정 시 덮어씀)
+  async upsertMonthlySchedule({
+    agentId,
+    scheduleMonth,
+    leaveDates,
+    annualLeaveDates,
+    annualLeaveCount,
+  }: MonthlyScheduleDto): Promise<void> {
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      const query = `
+        INSERT INTO monthly_schedules
+          (monthly_schedule_id, agent_information_id, schedule_month, leave_dates, annual_leave_dates, annual_leave_count)
+        VALUES (UUID(), ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          leave_dates = VALUES(leave_dates),
+          annual_leave_dates = VALUES(annual_leave_dates),
+          annual_leave_count = VALUES(annual_leave_count);`;
+
+      await conn.execute<ResultSetHeader>(query, [
+        agentId,
+        scheduleMonth,
+        leaveDates,
+        annualLeaveDates,
+        annualLeaveCount,
+      ]);
+    } catch (error) {
+      throw new ServerError('Database Error Occurred');
+    } finally {
+      conn?.release();
+    }
+  }
+
+  // 특정 연도(예: '2026')의 인원별 누적 사용 연차 수
+  async getAnnualLeaveUsageByYear(
+    year: string
+  ): Promise<AnnualLeaveUsageEntity[]> {
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      const query = `
+        SELECT agent_information_id, COALESCE(SUM(annual_leave_count), 0) AS used
+        FROM monthly_schedules
+        WHERE schedule_month LIKE ?
+        GROUP BY agent_information_id;`;
+
+      const [rows] = await conn.execute<AnnualLeaveUsageEntity[]>(query, [
+        `${year}-%`,
+      ]);
+
+      return rows;
+    } catch (error) {
+      throw new ServerError('Database Error Occurred');
+    } finally {
+      conn?.release();
     }
   }
 }

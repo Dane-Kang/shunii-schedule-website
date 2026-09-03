@@ -22,6 +22,14 @@ class AgentinfoHTTP {
   async deleteAgentinfo(agentid:string, body: any) {
     return await this.instance.delete(`/apis/agentinfo/infos/${agentid}`, body);
   }
+
+  async confirmMonthlySchedule(body: any) {
+    return await this.instance.post("/apis/agentinfo/schedule/confirm", body);
+  }
+
+  async getAnnualLeaveUsage(year: string) {
+    return await this.instance.get(`/apis/agentinfo/annual-leave/usage?year=${year}`);
+  }
 }
 
 const agentAPI = new AgentinfoHTTP();

@@ -6,6 +6,8 @@ const router: express.Router = express.Router();
 router.get('/count', agentinfoCtrl.getAgentCount);
 router.get('/infos', agentinfoCtrl.getAgentinfos);
 router.post('/infos', agentinfoCtrl.createAgentinfo);
+router.get('/annual-leave/usage', agentinfoCtrl.getAnnualLeaveUsage);
+router.post('/schedule/confirm', agentinfoCtrl.confirmMonthlySchedule);
 router.delete('/infos/:id', agentinfoCtrl.deleteAgentinfoById);
 router.patch(
     '/infos/:id',
