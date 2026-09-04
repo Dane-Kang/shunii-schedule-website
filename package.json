@@ -1,7 +1,7 @@
 {
-  "name": "create-schedule-calender",
+  "name": "shunii-schedule-website",
   "version": "1.0.0",
-  "description": "",
+  "description": "매장 직원 월 휴무 스케줄 웹앱 (client + server)",
   "main": "index.js",
   "scripts": {
     "start:all": "bash ./scripts/start-all.sh",
@@ -10,26 +10,12 @@
     "stop:server": "bash ./scripts/stop-server.sh",
     "exit:all": "bash ./scripts/exit-all.sh",
     "bootstrap": "bash ./scripts/install-dependencies.sh",
-    "start:windows": "cd ./server/app && tsc && copy swagger.yaml build && docker-compose -f ./server/docker-compose.yml --env-file ./config/.server.env up -d && env-cmd -f ./config/.client.env npm start --prefix ./client/app"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/modern-agile-team/create-dev-portfolio.git"
+    "start:windows": "cd ./server/app && tsc && docker-compose -f ./server/docker-compose.yml --env-file ./config/.server.env up -d && env-cmd -f ./config/.client.env npm start --prefix ./client/app"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/modern-agile-team/create-dev-portfolio/issues"
-  },
-  "homepage": "https://github.com/modern-agile-team/create-dev-portfolio#readme",
   "dependencies": {
-    "@fullcalendar/core": "^6.1.14",
-    "@fullcalendar/daygrid": "^6.1.14",
-    "@fullcalendar/interaction": "^6.1.14",
-    "@fullcalendar/react": "^6.1.14",
-    "@types/react-modal": "^3.16.3",
-    "env-cmd": "^10.1.0",
-    "react-modal": "^3.16.3"
+    "env-cmd": "^10.1.0"
   }
 }

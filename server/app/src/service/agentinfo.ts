@@ -56,7 +56,7 @@ class Agentinfo {
       annualleave
     );
 
-    return { success: true, msg: 'Visitor comment update complete' };
+    return { success: true, msg: 'Agent info update complete' };
   }
 
   async getAgentCount(): Promise<number> {

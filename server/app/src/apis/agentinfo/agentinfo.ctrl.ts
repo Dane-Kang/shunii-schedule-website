@@ -167,7 +167,7 @@ const deleteAgentinfoById = async (req: Request, res: Response) => {
     if (response)
       return res.status(200).json({
         statusCode: 200,
-        msg: 'Successful deletion of visitor comment',
+        msg: 'Successful deletion of agent info',
       });
   } catch (err) {
     return errorResposne(err, res);
