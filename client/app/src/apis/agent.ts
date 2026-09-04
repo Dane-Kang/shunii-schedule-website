@@ -38,6 +38,14 @@ class AgentinfoHTTP {
   async getMonthlySchedule(month: string) {
     return await this.instance.get(`/apis/agentinfo/schedule?month=${month}`);
   }
+
+  async getSettings() {
+    return await this.instance.get("/apis/agentinfo/settings");
+  }
+
+  async updateSettings(body: any) {
+    return await this.instance.put("/apis/agentinfo/settings", body);
+  }
 }
 
 const agentAPI = new AgentinfoHTTP();

@@ -45,3 +45,8 @@ export interface AnnualLeaveUsageEntity extends RowDataPacket {
   agent_information_id: string;
   used: number;
 }
+
+export interface AppSettingEntity extends RowDataPacket {
+  setting_key: string;
+  setting_value: string;
+}

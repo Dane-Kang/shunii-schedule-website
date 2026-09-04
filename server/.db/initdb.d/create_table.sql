@@ -42,4 +42,12 @@ CREATE TABLE IF NOT EXISTS `monthly_leaves` (
   KEY `idx_schedule_month` (`schedule_month`)
 );
 
+-- 앱 전역 설정 (키-값). 값은 JSON 문자열로 저장. 예) subjob1, subjob2, essentialWork
+CREATE TABLE IF NOT EXISTS `app_settings` (
+  `setting_key` VARCHAR(64) NOT NULL,
+  `setting_value` TEXT NOT NULL,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`setting_key`)
+);
+
 INSERT INTO number_of_visitors (total_count, today_count) VALUES (0, 0);

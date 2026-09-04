@@ -150,6 +150,45 @@ class Agentinfo {
     return { usage };
   }
 
+  // 앱 전역 설정 조회: 저장된 JSON 문자열을 파싱해서 반환
+  async getAppSettings(): Promise<{ settings: { [key: string]: unknown } }> {
+    const rows = await this.agentinfoRepository.getAppSettings();
+
+    const settings: { [key: string]: unknown } = {};
+    rows.forEach((r) => {
+      try {
+        settings[r.setting_key] = JSON.parse(r.setting_value);
+      } catch {
+        settings[r.setting_key] = r.setting_value;
+      }
+    });
+
+    return { settings };
+  }
+
+  // 앱 전역 설정 저장: body 의 각 키를 JSON 문자열로 upsert
+  async updateAppSettings(
+    body: { [key: string]: unknown }
+  ): Promise<{ success: boolean; count: number }> {
+    if (!body || typeof body !== 'object' || Array.isArray(body))
+      throw new BadRequestError('body must be an object of { key: value }');
+
+    const keys = Object.keys(body);
+    if (keys.length === 0)
+      throw new BadRequestError('body must contain at least one setting');
+
+    for (const key of keys) {
+      if (!/^[a-zA-Z0-9_]{1,64}$/.test(key))
+        throw new BadRequestError(`invalid setting key: ${key}`);
+      await this.agentinfoRepository.upsertAppSetting(
+        key,
+        JSON.stringify(body[key])
+      );
+    }
+
+    return { success: true, count: keys.length };
+  }
+
   async deleteAgentinfoById(agentinfoId: string): Promise<boolean> {
     const agentdata = await this.agentinfoRepository.getAgentinfoById(
       agentinfoId

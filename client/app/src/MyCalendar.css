@@ -1,3 +1,43 @@
 body {
   margin: 0;
 }
+
+/* ── 날짜 셀 커스텀 내용 (숫자 + 공휴일명) ── */
+.optimized_calendar .kr-day-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 2px 4px;
+  line-height: 1.15;
+}
+.optimized_calendar .kr-day-num {
+  font-size: 13px;
+}
+.optimized_calendar .kr-holiday-name {
+  font-size: 10px;
+  color: #d11;
+  white-space: nowrap;
+}
+
+/* 지난달/다음달 날짜는 흐리게 */
+.optimized_calendar .fc-day-other .kr-day-cell {
+  opacity: 0.35;
+}
+
+/* ── 주말 ── */
+.optimized_calendar .fc-day-sun .kr-day-num {
+  color: #d11;
+}
+.optimized_calendar .fc-day-sat .kr-day-num {
+  color: #1a53d1;
+}
+
+/* ── 공휴일 ── */
+.optimized_calendar .fc-day.kr-holiday {
+  background: rgba(221, 17, 17, 0.08);
+}
+.optimized_calendar .fc-day.kr-holiday .kr-day-num {
+  color: #d11;
+  font-weight: 700;
+}

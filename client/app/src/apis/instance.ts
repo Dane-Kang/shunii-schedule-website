@@ -24,7 +24,10 @@ export class HTTP {
   async put(api: string, data: any) {
     return await fetch(`${this.domain}${api}`, {
       method: "PUT",
-      ...data,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
     }).then((res) => res.json());
   }
 

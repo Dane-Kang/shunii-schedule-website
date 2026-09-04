@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import agentAPI from "../apis/agent";
 import { DateObject } from 'react-multi-date-picker'; // DateObject를 임포트
 import { EventInput } from '@fullcalendar/core';
@@ -24,6 +24,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [monthlySchedule, setMonthlySchedule] = useState<
     { agentId: string; name: string; jobLevel: string; date: string; type: "leave" | "annual" }[]
   >([]);
+  const appSettingsLoadedRef = useRef(false); // 서버 설정 최초 로드 완료 여부
 
   const handleCreateAgent = async (
     name: string, joblevel: string, description: string, annualleave: string
@@ -202,6 +203,39 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
       fetchAnnualLeaveUsage(currentMonth);
     }
   }, [currentMonth]);
+
+  // 앱 시작 시 서버에 저장된 설정(보조직무 / 필수 근무 조건)을 불러와 적용
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await agentAPI.getSettings();
+        const s = result?.settings ?? {};
+        if (Array.isArray(s.subjob1)) setSelectedSubjob1(s.subjob1);
+        if (Array.isArray(s.subjob2)) setSelectedSubjob2(s.subjob2);
+        if (Array.isArray(s.essentialWork) && s.essentialWork.length >= 5)
+          setScheduleEssentialWork(s.essentialWork);
+      } catch (err) {
+        console.error("getSettings error", err);
+      } finally {
+        appSettingsLoadedRef.current = true;
+      }
+    })();
+  }, []);
+
+  // 보조직무 / 필수 근무 조건이 바뀌면 (최초 로드 이후) 디바운스 후 서버에 자동 저장
+  useEffect(() => {
+    if (!appSettingsLoadedRef.current) return;
+    const timer = setTimeout(() => {
+      agentAPI
+        .updateSettings({
+          subjob1: selectedSubjob1,
+          subjob2: selectedSubjob2,
+          essentialWork: scheduleEssentialWork,
+        })
+        .catch((err) => console.error("updateSettings error", err));
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [selectedSubjob1, selectedSubjob2, scheduleEssentialWork]);
 
   return (
     <AgentContext.Provider

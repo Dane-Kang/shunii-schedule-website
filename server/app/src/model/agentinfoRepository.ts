@@ -1,6 +1,6 @@
 import { OkPacket, ResultSetHeader, RowDataPacket } from 'mysql2';
 import {
-  AgentinfoEntity, AgentinfoDto, MonthlyLeaveDto, MonthlyLeaveRow, AnnualLeaveUsageEntity,
+  AgentinfoEntity, AgentinfoDto, MonthlyLeaveDto, MonthlyLeaveRow, AnnualLeaveUsageEntity, AppSettingEntity,
 } from '../apis/agentinfo/agentinfo';
 import db from '../config/db';
 import { ServerError } from '../service/error';
@@ -207,6 +207,15 @@ class AgentinfoRepository {
     try {
       conn = await db.getConnection();
 
+      // app_settings 는 삭제하지 않고 없으면 생성만 (기존 DB 대비)
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS \`app_settings\` (
+          \`setting_key\` VARCHAR(64) NOT NULL,
+          \`setting_value\` TEXT NOT NULL,
+          \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (\`setting_key\`)
+        );`);
+
       await conn.query('DROP TABLE IF EXISTS `monthly_schedules`;');
       await conn.query('DROP TABLE IF EXISTS `monthly_leaves`;');
       await conn.query(`
@@ -270,6 +279,43 @@ class AgentinfoRepository {
       ]);
 
       return rows;
+    } catch (error) {
+      throw new ServerError('Database Error Occurred');
+    } finally {
+      conn?.release();
+    }
+  }
+
+  // 앱 전역 설정 전체 조회 (키-값)
+  async getAppSettings(): Promise<AppSettingEntity[]> {
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      const [rows] = await conn.execute<AppSettingEntity[]>(
+        'SELECT setting_key, setting_value FROM app_settings;'
+      );
+
+      return rows;
+    } catch (error) {
+      throw new ServerError('Database Error Occurred');
+    } finally {
+      conn?.release();
+    }
+  }
+
+  // 앱 전역 설정 한 건 upsert
+  async upsertAppSetting(key: string, value: string): Promise<void> {
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      await conn.execute(
+        `INSERT INTO app_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);`,
+        [key, value]
+      );
     } catch (error) {
       throw new ServerError('Database Error Occurred');
     } finally {

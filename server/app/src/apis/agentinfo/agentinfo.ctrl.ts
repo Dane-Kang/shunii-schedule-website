@@ -98,6 +98,32 @@ const getMonthlySchedule = async (req: Request, res: Response) => {
   }
 };
 
+const getAppSettings = async (req: Request, res: Response) => {
+  try {
+    console.log('Enter getAppSettings');
+    const agentinfo = new Agentinfo(new AgentinfoRepository());
+
+    const response = await agentinfo.getAppSettings();
+
+    return res.status(200).json({ statusCode: 200, ...response });
+  } catch (err) {
+    return errorResposne(err, res);
+  }
+};
+
+const updateAppSettings = async (req: Request, res: Response) => {
+  try {
+    console.log('Enter updateAppSettings');
+    const agentinfo = new Agentinfo(new AgentinfoRepository());
+
+    const response = await agentinfo.updateAppSettings(req.body);
+
+    return res.status(200).json({ statusCode: 200, ...response });
+  } catch (err) {
+    return errorResposne(err, res);
+  }
+};
+
 const resetMonthlySchedule = async (req: Request, res: Response) => {
   try {
     console.log('Enter resetMonthlySchedule');
@@ -157,5 +183,7 @@ export = {
   confirmMonthlySchedule,
   getMonthlySchedule,
   getAnnualLeaveUsage,
+  getAppSettings,
+  updateAppSettings,
   resetMonthlySchedule,
 };

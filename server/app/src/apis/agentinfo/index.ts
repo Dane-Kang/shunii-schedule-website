@@ -7,6 +7,8 @@ router.get('/count', agentinfoCtrl.getAgentCount);
 router.get('/infos', agentinfoCtrl.getAgentinfos);
 router.post('/infos', agentinfoCtrl.createAgentinfo);
 router.get('/annual-leave/usage', agentinfoCtrl.getAnnualLeaveUsage);
+router.get('/settings', agentinfoCtrl.getAppSettings);
+router.put('/settings', agentinfoCtrl.updateAppSettings);
 router.get('/schedule', agentinfoCtrl.getMonthlySchedule);
 router.post('/schedule/confirm', agentinfoCtrl.confirmMonthlySchedule);
 router.post('/schedule/reset', agentinfoCtrl.resetMonthlySchedule);

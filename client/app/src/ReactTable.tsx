@@ -223,13 +223,19 @@ const Table: React.FC = () => {
   };
 
   const handleSubjob1Change = (colIndex: number, value: string) => {
-    selectedSubjob1[colIndex] = value;
-    setSelectedSubjob1(selectedSubjob1);
+    setSelectedSubjob1((prev: string[]) => {
+      const next = [...prev];
+      next[colIndex] = value;
+      return next;
+    });
   };
 
   const handleSubjob2Change = (colIndex: number, value: string) => {
-    selectedSubjob2[colIndex] = value;
-    setSelectedSubjob2(selectedSubjob2);
+    setSelectedSubjob2((prev: string[]) => {
+      const next = [...prev];
+      next[colIndex] = value;
+      return next;
+    });
   };
 
   const handlePresetWorkNumberChange = (colIndex: number, value: string) => {
