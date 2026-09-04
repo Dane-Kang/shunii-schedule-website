@@ -15,12 +15,13 @@ export interface AgentinfoEntity extends RowDataPacket {
   annualleave: string;
 }
 
-export interface MonthlyScheduleDto {
+export type LeaveType = 'leave' | 'annual';
+
+export interface MonthlyLeaveDto {
   agentId: string;
   scheduleMonth: string; // 'YYYY-MM'
-  leaveDates: string; // 콤마 구분 'YYYY-MM-DD'
-  annualLeaveDates: string; // 콤마 구분 'YYYY-MM-DD'
-  annualLeaveCount: number;
+  leaveDate: string; // 'YYYY-MM-DD'
+  leaveType: LeaveType;
 }
 
 export interface ConfirmScheduleBody {
@@ -30,6 +31,14 @@ export interface ConfirmScheduleBody {
     leaveDates: string[];
     annualLeaveDates: string[];
   }[];
+}
+
+export interface MonthlyLeaveRow extends RowDataPacket {
+  agentId: string;
+  name: string;
+  jobLevel: string;
+  date: string; // 'YYYY-MM-DD'
+  type: LeaveType;
 }
 
 export interface AnnualLeaveUsageEntity extends RowDataPacket {

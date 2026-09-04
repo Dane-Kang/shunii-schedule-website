@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAgent } from "./hooks/useAgentinfo";
 import "./App.css";
 import "./styles.css";
@@ -26,14 +26,15 @@ function App() {
     holiday,
     alternativeholiday,
     currentMonth,
+    monthlySchedule,
     confirmSchedule,
+    resetMonthlyScheduleTable,
   } = useAgent();
 
   const [agentData, setAgentData] = useState<Agentinfo[]>([]);
-  const [leaveSchedule, setLeaveSchedule] = useState<EventInput[]>([]);
-  const [leaveCount, setLeaveCount] = useState<{ [key: string]: number }>({});
-  // 확정 저장을 위해 마지막으로 생성된 휴무(가공 전 원본)를 보관
+  // 확정 저장을 위해 마지막으로 생성된 휴무(가공 전 원본)와 그 대상 달을 보관
   const [generatedLeaves, setGeneratedLeaves] = useState<{ name: string; date: string }[]>([]);
+  const [generatedMonth, setGeneratedMonth] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState(false);
 
   const jobLevelColors: { [key: string]: string } = {
@@ -468,13 +469,68 @@ function App() {
     log("Result allLeaves : ", allLeaves);
     log("Result tempLeaveCounter : ", tempLeaveCounter);
 
-    setLeaveSchedule(result);
-    setLeaveCount(tempLeaveCounter);
+    // 결과는 화면에만 반영 (확정 전까지 서버 저장 안 됨)
     setGeneratedLeaves(allLeaves.map(({ name, date }) => ({ name, date })));
+    setGeneratedMonth(ym);
   };
 
   const genSch = () => {
+    if (
+      monthlySchedule.length > 0 &&
+      !window.confirm(
+        `${currentMonth} 은(는) 이미 확정된 스케줄이 있습니다.\n새로 생성하시겠어요? (확정을 누르기 전까지는 저장되지 않습니다)`
+      )
+    ) {
+      return;
+    }
     generateLeaveSchedule();
+  };
+
+  // 달력에 표시할 이벤트: 이번 달을 방금 생성했으면 그 제안, 아니면 서버 저장본
+  const buildCalendarEvents = (
+    items: { name: string; date: string; jobLevel?: string; type?: string }[]
+  ): EventInput[] => {
+    const perPerson: { [key: string]: number } = {};
+    return [...items]
+      .filter((i) => i.date)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((i) => {
+        perPerson[i.name] = (perPerson[i.name] || 0) + 1;
+        const jobLevel =
+          i.jobLevel || agentData.find((emp) => emp.name === i.name)?.job_level || "";
+        const label = i.type === "annual" ? " 연차" : "";
+        return {
+          title: `${i.name} (${perPerson[i.name]}일)${label}`,
+          start: i.date,
+          color: jobLevelColors[jobLevel],
+        };
+      });
+  };
+
+  const calendarEvents = useMemo(() => {
+    if (generatedMonth && generatedMonth === currentMonth && generatedLeaves.length > 0) {
+      return buildCalendarEvents(generatedLeaves);
+    }
+    return buildCalendarEvents(monthlySchedule);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedMonth, currentMonth, generatedLeaves, monthlySchedule, agentData]);
+
+  // 스케줄 초기화: 확정 저장 기록(monthly_leaves) 삭제 + 모든 직원의 원하는 휴일/연차 신청 비움
+  const resetScheduleTable = async () => {
+    if (isConfirming) return;
+    if (!window.confirm(
+      "확정 저장된 모든 스케줄/연차 사용 기록이 삭제되고,\n직원들의 '원하는 휴일'과 '연차 신청' 입력도 모두 비워집니다.\n(이름/직무는 그대로 유지) 계속할까요?"
+    )) return;
+    try {
+      setIsConfirming(true);
+      const ok = await resetMonthlyScheduleTable();
+      if (ok) alert("스케줄 테이블을 초기화했습니다.");
+    } catch (err) {
+      console.error("reset schedule table error", err);
+      alert("테이블 초기화 중 오류가 발생했습니다.");
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   // 생성된 스케줄을 확인하고 마음에 들면 서버에 확정 저장
@@ -518,7 +574,12 @@ function App() {
     try {
       setIsConfirming(true);
       const ok = await confirmSchedule(currentMonth, entries);
-      if (ok) alert(`${currentMonth} 스케줄을 확정 저장했습니다.`);
+      if (ok) {
+        // 저장 후에는 서버 저장본을 표시하도록 생성 제안 상태를 비움
+        setGeneratedLeaves([]);
+        setGeneratedMonth("");
+        alert(`${currentMonth} 스케줄을 확정 저장했습니다.`);
+      }
     } catch (err) {
       console.error("confirm schedule error", err);
       alert("스케줄 확정 저장 중 오류가 발생했습니다.");
@@ -529,12 +590,15 @@ function App() {
 
   return (
     <div className="App">
-      <MyCalendar events={leaveSchedule} />
+      <MyCalendar events={calendarEvents} />
       <div style={{ height: "10px" }}></div>
       <div style={{ display: 'flex', gap: '10px', marginLeft: '400px', marginTop: '10px' }}>
         <button onClick={genSch}> Generate </button>
         <button onClick={confirmGeneratedSchedule} disabled={isConfirming || generatedLeaves.length === 0}>
           {isConfirming ? '확정 중...' : '확정'}
+        </button>
+        <button onClick={resetScheduleTable} disabled={isConfirming} style={{ marginLeft: '20px', color: '#b6003b' }}>
+          스케줄·휴일 입력 초기화
         </button>
       </div>
       <div style={{ height: "10px" }}></div>

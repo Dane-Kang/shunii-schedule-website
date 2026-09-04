@@ -27,8 +27,16 @@ class AgentinfoHTTP {
     return await this.instance.post("/apis/agentinfo/schedule/confirm", body);
   }
 
-  async getAnnualLeaveUsage(year: string) {
-    return await this.instance.get(`/apis/agentinfo/annual-leave/usage?year=${year}`);
+  async getAnnualLeaveUsage(month: string) {
+    return await this.instance.get(`/apis/agentinfo/annual-leave/usage?month=${month}`);
+  }
+
+  async resetMonthlyScheduleTable() {
+    return await this.instance.post("/apis/agentinfo/schedule/reset", {});
+  }
+
+  async getMonthlySchedule(month: string) {
+    return await this.instance.get(`/apis/agentinfo/schedule?month=${month}`);
   }
 }
 

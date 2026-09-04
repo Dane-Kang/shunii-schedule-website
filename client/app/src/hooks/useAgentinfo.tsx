@@ -20,6 +20,10 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [selectedSubjob2, setSelectedSubjob2] = useState<string[]>([]);
   const [currentMonth, setCurrentMonth] = useState<string>(""); // 초기값 현재 달
   const [annualLeaveUsage, setAnnualLeaveUsage] = useState<{ [agentId: string]: number }>({}); // 인원별 누적 사용 연차
+  // 현재 보고 있는 달의 확정 휴일/연차 (서버 저장본)
+  const [monthlySchedule, setMonthlySchedule] = useState<
+    { agentId: string; name: string; jobLevel: string; date: string; type: "leave" | "annual" }[]
+  >([]);
 
   const handleCreateAgent = async (
     name: string, joblevel: string, description: string, annualleave: string
@@ -72,18 +76,43 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     setRows(count.response);
   };
 
-  // 특정 연도의 인원별 누적 사용 연차 수를 서버에서 조회
-  const fetchAnnualLeaveUsage = async (year: string) => {
-    if (!/^\d{4}$/.test(year)) return;
+  // 해당 연도 1월부터 지정한 달('YYYY-MM')까지의 인원별 누적 사용 연차 수를 서버에서 조회
+  const fetchAnnualLeaveUsage = async (month: string) => {
+    if (!/^\d{4}-\d{2}$/.test(month)) return;
     try {
-      const result = await agentAPI.getAnnualLeaveUsage(year);
+      const result = await agentAPI.getAnnualLeaveUsage(month);
       setAnnualLeaveUsage(result?.usage ?? {});
     } catch (err) {
       console.error("fetchAnnualLeaveUsage error", err);
     }
   };
 
-  // 확정된 월 스케줄을 서버에 저장 (인원 x 월 별 덮어쓰기)
+  // 특정 달('YYYY-MM')의 확정 휴일/연차(서버 저장본)를 조회
+  const fetchMonthlySchedule = async (month: string) => {
+    if (!/^\d{4}-\d{2}$/.test(month)) return;
+    try {
+      const result = await agentAPI.getMonthlySchedule(month);
+      setMonthlySchedule(result?.leaves ?? []);
+    } catch (err) {
+      console.error("fetchMonthlySchedule error", err);
+      setMonthlySchedule([]);
+    }
+  };
+
+  // 스케줄 초기화: monthly_leaves DROP/재생성 + 모든 직원의 원하는 휴일/연차 신청 입력값 비움
+  const resetMonthlyScheduleTable = async () => {
+    const result = await agentAPI.resetMonthlyScheduleTable();
+    if (result?.statusCode && result.statusCode !== 200) {
+      alert(result.msg ?? "테이블 초기화에 실패했습니다.");
+      return false;
+    }
+    setAnnualLeaveUsage({});
+    setMonthlySchedule([]);
+    await syncAgentList(); // 비워진 직원 입력값을 화면에 반영
+    return true;
+  };
+
+  // 확정된 월 스케줄을 서버에 저장 (인원 x 월 별 통째 교체)
   const confirmSchedule = async (
     scheduleMonth: string,
     entries: { agentId: string; leaveDates: string[]; annualLeaveDates: string[] }[]
@@ -93,8 +122,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
       alert(result.msg ?? "스케줄 확정에 실패했습니다.");
       return false;
     }
-    // 저장 후 해당 연도 누적 연차 갱신
-    await fetchAnnualLeaveUsage(scheduleMonth.split("-")[0]);
+    // 저장 후 해당 달 저장본 + 그 달까지의 누적 연차 갱신
+    await fetchMonthlySchedule(scheduleMonth);
+    await fetchAnnualLeaveUsage(scheduleMonth);
     return true;
   };
 
@@ -110,30 +140,29 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         const description = agent.description;
         const annualleave = agent.annualleave;
         const name = agent.name;
-        const serverDates = description.split(',').map((date: string) => date.trim());  // 공백을 제거하고 배열로 변환
-        const serverANDates = annualleave.split(',').map((date: string) => date.trim());  // 공백을 제거하고 배열로 변환
+        // 빈 값('')은 날짜가 없는 것으로 처리 (초기화된 직원 등)
+        const serverDates = description.split(',').map((date: string) => date.trim()).filter((date: string) => date.length > 0);
+        const serverANDates = annualleave.split(',').map((date: string) => date.trim()).filter((date: string) => date.length > 0);
 
         const dateObjects = serverDates.map((dateStr: string) => {
-          const trimmedDateStr = dateStr.trim(); // 공백 제거
-          const [year, month, day] = trimmedDateStr.split('-').map(Number);
+          const [year, month, day] = dateStr.split('-').map(Number);
           return new DateObject({ year, month, day });
         });
         selectedDatesMapping[rowid] = { name, date: dateObjects };
 
         const dateANObjects = serverANDates.map((dateStr: string) => {
-          const trimmedDateStr = dateStr.trim(); // 공백 제거
-          const [year, month, day] = trimmedDateStr.split('-').map(Number);
+          const [year, month, day] = dateStr.split('-').map(Number);
           return new DateObject({ year, month, day });
         });
         selectedANDatesMapping[rowid] = { name, date: dateANObjects };
 
-        const eventInput:EventInput[] = description.split(',').map((date: string) => {
-          return {title:name,start:date.trim()};
+        const eventInput:EventInput[] = serverDates.map((date: string) => {
+          return {title:name,start:date};
         });
         selectedleaveMapping.push(...eventInput); //selectedleaveMapping에 eventInput 추가
 
-        const eventANInput:EventInput[] = annualleave.split(',').map((date: string) => {
-          return {title:name,start:date.trim()};
+        const eventANInput:EventInput[] = serverANDates.map((date: string) => {
+          return {title:name,start:date};
         });
         selectedannualleaveMapping.push(...eventANInput); //selectedannualleaveMapping eventInput 추가
       });
@@ -166,10 +195,11 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     setSelectedDateList();
   }, [agentList]);
 
-  // 달력에서 보고 있는 달이 바뀌면 해당 연도의 누적 사용 연차를 다시 조회
+  // 달력에서 보고 있는 달이 바뀌면 그 달의 확정 저장본과 그 달까지의 누적 사용 연차를 다시 조회
   useEffect(() => {
     if (currentMonth && /^\d{4}-\d{2}$/.test(currentMonth)) {
-      fetchAnnualLeaveUsage(currentMonth.split("-")[0]);
+      fetchMonthlySchedule(currentMonth);
+      fetchAnnualLeaveUsage(currentMonth);
     }
   }, [currentMonth]);
 
@@ -193,7 +223,10 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         currentMonth,
         annualLeaveUsage,
         fetchAnnualLeaveUsage,
+        monthlySchedule,
+        fetchMonthlySchedule,
         confirmSchedule,
+        resetMonthlyScheduleTable,
         setLeaveList,
         syncAgentList,
         setSelectedDates,

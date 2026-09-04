@@ -271,13 +271,15 @@ const Table: React.FC = () => {
   return (
     <div>
       <table className='table-style'>
-        <tr>
-          {colWidthSetSchedule.map((width, colIndex) => (
-            <th key={colIndex} style={{ width: `${width}px` }}>
-              {headerNamesSetSchedule[colIndex]}
-            </th>
-          ))}
-        </tr>
+        <thead>
+          <tr>
+            {colWidthSetSchedule.map((width, colIndex) => (
+              <th key={colIndex} style={{ width: `${width}px` }}>
+                {headerNamesSetSchedule[colIndex]}
+              </th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
           <tr>
             {colWidthSetSchedule.map((width, colIndex) => (
@@ -298,13 +300,15 @@ const Table: React.FC = () => {
       </table>
       <div style={{ height: "5px" }}></div> {/* 여백 추가 */}
       <table className='table-style'>
-        <tr>
-          {colWidthSetSchedule2.map((width, colIndex) => (
-            <th key={colIndex} style={{ width: `${width}px` }}>
-              {headerNamesSetSchedule2[colIndex]}
-            </th>
-          ))}
-        </tr>
+        <thead>
+          <tr>
+            {colWidthSetSchedule2.map((width, colIndex) => (
+              <th key={colIndex} style={{ width: `${width}px` }}>
+                {headerNamesSetSchedule2[colIndex]}
+              </th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
           <tr>
             {colWidthSetSchedule2.map((width, colIndex) => (
@@ -321,13 +325,15 @@ const Table: React.FC = () => {
       </table>
       <div style={{ height: "30px" }}></div> {/* 여백 추가 */}
       <table className='table-style'>
-        <tr>
-          {colWidthHeaderSubjobs.map((width, colIndex) => (
-            <th key={colIndex} colSpan={2} style={{ width: `${width}px` }}>
-              {headerNamesSubjobs[colIndex]}
-            </th>
-          ))}
-        </tr>
+        <thead>
+          <tr>
+            {colWidthHeaderSubjobs.map((width, colIndex) => (
+              <th key={colIndex} colSpan={2} style={{ width: `${width}px` }}>
+                {headerNamesSubjobs[colIndex]}
+              </th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
           <tr>
             {colWidthSubjobs.map((width, colIndex) => (
@@ -336,8 +342,8 @@ const Table: React.FC = () => {
                   value={colIndex < 2 ? selectedSubjob1[colIndex] : selectedSubjob2[colIndex - 2]}
                   onChange={(e) => colIndex < 2 ? handleSubjob1Change(colIndex, e.target.value) : handleSubjob2Change(colIndex - 2, e.target.value)}>
                   <option value="">직원 선택</option>
-                  {data.map((peoples: Agent) => (
-                    <option value ={peoples.name}>{peoples.name}</option>
+                  {data.map((peoples: Agent, peopleIndex) => (
+                    <option key={peoples.id || peopleIndex} value={peoples.name}>{peoples.name}</option>
                   ))}
                 </select>
               </td>
@@ -427,8 +433,10 @@ const Table: React.FC = () => {
                 {(annualLeaveUsage && annualLeaveUsage[row.id]) || 0}
               </td>
               {row.isNew && (
-                <button onClick={() => setRowEvent(row, rowIndex)}>
+                <td>
+                  <button onClick={() => setRowEvent(row, rowIndex)}>
                     {row.ischecked ? 'Delete' : 'Save'}</button>
+                </td>
               )}
             </tr>
           ))}
