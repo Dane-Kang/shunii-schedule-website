@@ -7,11 +7,54 @@ import { ServerError } from '../service/error';
 
 class AgentinfoRepository {
 
+  // 기존 DB 마이그레이션:
+  //  - agent_informations.mandatory_workday 컬럼 추가
+  //  - monthly_leaves.leave_type ENUM 에 'comp'(대체휴무) 추가
+  async ensureAgentSchema(): Promise<void> {
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      const [cols]: [any[], any] = await conn.query(
+        `SELECT COUNT(*) AS cnt
+           FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'agent_informations'
+            AND COLUMN_NAME = 'mandatory_workday';`
+      );
+      if (!cols[0] || Number(cols[0].cnt) === 0) {
+        await conn.query(
+          `ALTER TABLE agent_informations
+             ADD COLUMN mandatory_workday varchar(255) NOT NULL DEFAULT '';`
+        );
+      }
+
+      const [enumRows]: [any[], any] = await conn.query(
+        `SELECT COLUMN_TYPE AS t
+           FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'monthly_leaves'
+            AND COLUMN_NAME = 'leave_type';`
+      );
+      if (enumRows[0] && !String(enumRows[0].t).includes("'comp'")) {
+        await conn.query(
+          `ALTER TABLE monthly_leaves
+             MODIFY COLUMN leave_type ENUM('leave','annual','comp') NOT NULL DEFAULT 'leave';`
+        );
+      }
+    } catch (error) {
+      throw new ServerError('Database Error Occurred');
+    } finally {
+      conn?.release();
+    }
+  }
+
   async createAgent({
     name,
     joblevel,
     description,
     annualleave,
+    mandatoryworkday,
   }: AgentinfoDto): Promise<string> {
     let conn;
     try {
@@ -19,14 +62,15 @@ class AgentinfoRepository {
       console.log("enter createAgent");
 
       const query = `
-        INSERT INTO agent_informations (agent_information_id, name, job_level, description, annualleave) 
-        VALUES (UUID(), ?, ?, ?, ?);`;
+        INSERT INTO agent_informations (agent_information_id, name, job_level, description, annualleave, mandatory_workday)
+        VALUES (UUID(), ?, ?, ?, ?, ?);`;
 
       const [row] = await conn.execute<ResultSetHeader>(query, [
         name,
         joblevel,
         description,
         annualleave,
+        mandatoryworkday ?? '',
       ]);
 
       return "true";
@@ -61,19 +105,21 @@ class AgentinfoRepository {
     name: string,
     joblevel: string,
     description: string,
-    annualleave: string
+    annualleave: string,
+    mandatoryworkday: string
   ): Promise<number> {
     let conn;
     try {
       conn = await db.getConnection();
 
-      const query = `UPDATE agent_informations SET name = ?, job_level = ?, description = ?, annualleave = ? WHERE agent_information_id = ?`;
+      const query = `UPDATE agent_informations SET name = ?, job_level = ?, description = ?, annualleave = ?, mandatory_workday = ? WHERE agent_information_id = ?`;
 
       const [row] = await conn.execute<OkPacket>(query, [
         name,
         joblevel,
         description,
         annualleave,
+        mandatoryworkday ?? '',
         agentId,
       ]);
 
@@ -105,7 +151,7 @@ class AgentinfoRepository {
       conn = await db.getConnection();
 
       const query = `
-        SELECT agent_information_id AS id, name, job_level, description, annualleave FROM agent_informations ORDER BY created_at ASC;`;
+        SELECT agent_information_id AS id, name, job_level, description, annualleave, mandatory_workday FROM agent_informations ORDER BY created_at ASC;`;
 
       const [row] = await conn.execute<AgentinfoEntity[]>(query);
 
@@ -224,7 +270,7 @@ class AgentinfoRepository {
           \`agent_information_id\` CHAR(36) NOT NULL,
           \`schedule_month\` CHAR(7) NOT NULL,
           \`leave_date\` DATE NOT NULL,
-          \`leave_type\` ENUM('leave', 'annual') NOT NULL DEFAULT 'leave',
+          \`leave_type\` ENUM('leave', 'annual', 'comp') NOT NULL DEFAULT 'leave',
           \`confirmed_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (\`monthly_leave_id\`),
           UNIQUE KEY \`uq_agent_date\` (\`agent_information_id\`, \`leave_date\`),
@@ -237,13 +283,14 @@ class AgentinfoRepository {
     }
   }
 
-  // 모든 직원의 '원하는 휴일'(description) / '연차 신청'(annualleave) 입력값만 비움 (이름/직무는 유지)
+  // 모든 직원의 '원하는 휴일'(description) / '연차 신청'(annualleave) / '필수 근무일'(mandatory_workday)
+  // 입력값만 비움 (이름/직무는 유지)
   async clearAgentLeaveInputs(): Promise<number> {
     let conn;
     try {
       conn = await db.getConnection();
 
-      const query = `UPDATE agent_informations SET description = '', annualleave = '';`;
+      const query = `UPDATE agent_informations SET description = '', annualleave = '', mandatory_workday = '';`;
 
       const [row] = await conn.execute<OkPacket>(query);
 

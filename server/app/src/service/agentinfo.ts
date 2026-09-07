@@ -29,6 +29,7 @@ class Agentinfo {
       joblevel: body.joblevel,
       description: body.description,
       annualleave: body.annualleave,
+      mandatoryworkday: body.mandatoryworkday ?? '',
     };
 
     const commentId = await this.agentinfoRepository.createAgent(
@@ -40,7 +41,8 @@ class Agentinfo {
   }
   
   async updateAgentinfoById(agentinfoId: string): Promise<Response> {
-    const { name, joblevel, description, annualleave }: AgentinfoDto = this.body;
+    const { name, joblevel, description, annualleave, mandatoryworkday }: AgentinfoDto =
+      this.body;
 
     const agentinfo = await this.agentinfoRepository.getAgentinfoById(
       agentinfoId
@@ -53,7 +55,8 @@ class Agentinfo {
       name,
       joblevel,
       description,
-      annualleave
+      annualleave,
+      mandatoryworkday ?? ''
     );
 
     return { success: true, msg: 'Agent info update complete' };
@@ -92,14 +95,20 @@ class Agentinfo {
       if (!entry.agentId) throw new BadRequestError('entry.agentId is required');
 
       const annualSet = new Set(clean(entry.annualLeaveDates));
+      const compSet = new Set(clean(entry.compLeaveDates));
       const allDates = new Set(clean(entry.leaveDates));
       annualSet.forEach((d) => allDates.add(d)); // 연차일도 휴무일에 포함
+      compSet.forEach((d) => allDates.add(d)); // 대체휴무일도 휴무일에 포함
 
       const rows = [...allDates].map((date) => ({
         agentId: entry.agentId,
         scheduleMonth,
         leaveDate: date,
-        leaveType: (annualSet.has(date) ? 'annual' : 'leave') as LeaveType,
+        leaveType: (annualSet.has(date)
+          ? 'annual'
+          : compSet.has(date)
+          ? 'comp'
+          : 'leave') as LeaveType,
       }));
 
       await this.agentinfoRepository.replaceAgentMonthLeaves(
@@ -128,6 +137,7 @@ class Agentinfo {
   //  - monthly_leaves 테이블 DROP 후 재생성 (확정 저장/연차 사용 기록 삭제)
   //  - 모든 직원의 '원하는 휴일' / '연차 신청' 입력값 비움 (이름/직무는 유지)
   async resetMonthlySchedule(): Promise<{ success: boolean; clearedAgents: number }> {
+    await this.agentinfoRepository.ensureAgentSchema();
     await this.agentinfoRepository.resetMonthlyLeavesTable();
     const clearedAgents = await this.agentinfoRepository.clearAgentLeaveInputs();
     return { success: true, clearedAgents };

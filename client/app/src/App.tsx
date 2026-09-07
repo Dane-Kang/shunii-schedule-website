@@ -4,9 +4,10 @@ import "./App.css";
 import "./styles.css";
 
 import MyCalendar from "./MyCalendar";
-import { EventInput } from "@fullcalendar/core";
+import { EventInput, EventDropArg } from "@fullcalendar/core";
 import { DateObject } from "react-multi-date-picker"; // DateObject를 임포트
 import Table from "./ReactTable";
+import { KOREAN_HOLIDAYS } from "./koreanHolidays";
 
 export interface Agentinfo {
   name: string;
@@ -23,6 +24,7 @@ function App() {
     selectedSubjob2,
     leaveList,
     annualLeaveList,
+    mandatoryWorkList,
     holiday,
     alternativeholiday,
     currentMonth,
@@ -33,7 +35,10 @@ function App() {
 
   const [agentData, setAgentData] = useState<Agentinfo[]>([]);
   // 확정 저장을 위해 마지막으로 생성된 휴무(가공 전 원본)와 그 대상 달을 보관
-  const [generatedLeaves, setGeneratedLeaves] = useState<{ name: string; date: string }[]>([]);
+  //  type: "leave" 일반 휴무 / "comp" 공휴일 근무 대체휴무 / "annual" 연차
+  const [generatedLeaves, setGeneratedLeaves] = useState<
+    { name: string; date: string; type: "leave" | "comp" | "annual" }[]
+  >([]);
   const [generatedMonth, setGeneratedMonth] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -43,9 +48,9 @@ function App() {
     "2층 매니저": "#010f96",  // 짙은 파랑
     "2층 부점장": "#9f00a2",  // 연보라
     "1층 대리": "#e65802",  // 주황
-    "2층 대리": "#e65802",  // 주황
-    "1층 사원": "#3a9401",  // 녹색
-    "2층 사원": "#3a9401",  // 녹색
+    "2층 대리": "#E62E96FF",  // 주황
+    "1층 사원": "#47A836FF",  // 녹색
+    "2층 사원": "#2E86F2FF",  // 파랑
   };
 
   useEffect(() => {
@@ -86,19 +91,25 @@ function App() {
     const dateOf = (day: number) => `${targetYear}-${pad2(targetMonth)}-${pad2(day)}`;
 
     //#################### 0-1. 필수 근무 조건
-    const maxLeavesPerEmployee = scheduleEssentialWork[0]; // 직원당 최대(의무) 휴무 일수
-    const minDailyEmployees = scheduleEssentialWork[1];    // 하루 최소 근무 인원
-    const avgDailyEmployees: number =
-      Math.floor(agentData.length - (maxLeavesPerEmployee * agentData.length) / daysInMonth) + 1; // 하루 평균 근무 인원
-    const minManagers = scheduleEssentialWork[2];    // 하루 최소 매니저 이상 근무 인원
-    const minFirstFloor = scheduleEssentialWork[3];  // 하루 최소 1층 근무 직원
-    const minSecondFloor = scheduleEssentialWork[4]; // 하루 최소 2층 근무 직원
-    const minWorkGap = 3; // 휴무 후 최소 연속 근무 일수
-    const maxWorkGap = 5; // 이 일수 이상 연속 근무하면 강제 휴무 후보
-    // 하루에 쉬어야 하는 목표 인원 (인원수에 따라 가변)
-    const dailyLeaveTarget = Math.max(1, agentData.length - avgDailyEmployees);
+    const maxLeavesPerEmployee = scheduleEssentialWork[0]; // 직원당 의무 휴무 일수 (연차 제외)
+    const weekdayWorkers = scheduleEssentialWork[1];       // 평일 목표 근무 인원
+    const weekendWorkers = weekdayWorkers + 1;             // 주말은 평일 +1
+    const minSeniors = scheduleEssentialWork[2];           // 하루 최소 책임급(점장·매니저·부점장) 인원
+    const minFirstFloor = scheduleEssentialWork[3];        // 하루 최소 1층 근무 인원
+    const minSecondFloor = scheduleEssentialWork[4];       // 하루 최소 2층 근무 인원
+    const minWorkGap = 3; // 목표: 연속 근무 3일 이하 후 휴무
+    const maxWorkGap = 5; // 절대 한계: 연속 근무는 maxWorkGap-1(=4)일까지. 4일 도달 시 다음 날 강제 휴무
+
+    // 요일 판별 → 평일/주말 목표 근무·휴무 인원
+    const dowOf = (day: number) => new Date(targetYear, targetMonth - 1, day).getDay(); // 0=일 … 6=토
+    const isWeekendDay = (day: number) => dowOf(day) === 0 || dowOf(day) === 6;
+    const workTargetOf = (day: number) => (isWeekendDay(day) ? weekendWorkers : weekdayWorkers);
+    const leaveTargetOf = (day: number) => Math.max(0, agentData.length - workTargetOf(day));
+    const maxDailyLeave = Math.max(1, agentData.length - weekdayWorkers); // fillSparseDays 레벨 상한
 
     //#################### 0-2. 전체 휴무 / 대체 휴무 (대상 월의 '일' 숫자만)
+    //  - offday      : 매장 전체 휴무 (근무/휴무 개념 없음, 의무 휴무 카운트 미포함)
+    //  - alteroffday : 그 날 근무자에게 대체 휴무 1일 크레딧
     const offday: number[] = [];
     const alteroffday: number[] = [];
     holiday.forEach((d: DateObject) => {
@@ -109,19 +120,65 @@ function App() {
       const jd = d.toDate();
       if (jd.getFullYear() === targetYear && jd.getMonth() + 1 === targetMonth) alteroffday.push(jd.getDate());
     });
+    // 한국 공휴일 자동 반영: 설날·추석 '당일' → 전체 휴무 / 그 외 공휴일 → 근무 + 대체휴무 크레딧
+    for (let day = 1; day <= daysInMonth; day++) {
+      const holidayName = KOREAN_HOLIDAYS[dateOf(day)];
+      if (!holidayName) continue;
+      if (holidayName === "설날" || holidayName === "추석") {
+        if (!offday.includes(day)) offday.push(day);
+      } else if (!alteroffday.includes(day)) {
+        alteroffday.push(day);
+      }
+    }
 
     //#################### 0-3. 직급 판별 헬퍼
-    const isMainAdmin = (e: Agentinfo) => e.job_level === "점장" || e.job_level === "2층 부점장";
-    const isSubAdmin = (e: Agentinfo) => e.job_level === "2층 부점장" || e.job_level === "1층 매니저";
-    const isManager = (e: Agentinfo) =>
-      e.job_level === "점장" || e.job_level === "1층 매니저" || e.job_level === "2층 매니저" || e.job_level === "2층 부점장";
+    const isDirector = (e: Agentinfo) => e.job_level === "점장"; // 점장: 사전 확정 휴무일에만 쉼 (알고리즘 배정 제외)
+    const isTopAdmin = (e: Agentinfo) => e.job_level === "점장" || e.job_level === "2층 부점장"; // 점장·부점장
+    const isPureManager = (e: Agentinfo) => e.job_level === "1층 매니저" || e.job_level === "2층 매니저";
+    const isSenior = (e: Agentinfo) => isTopAdmin(e) || isPureManager(e); // 책임급 (점장·매니저·부점장)
+    // 각 층 소속 인원 (점장은 층 고정이 아니라 '유동' — 부족한 층을 메움, floorCoverageOk 참고)
     const isFirstFloor = (e: Agentinfo) =>
       e.job_level === "1층 사원" || e.job_level === "1층 대리" || e.job_level === "1층 매니저";
     const isSecondFloor = (e: Agentinfo) =>
       e.job_level === "2층 사원" || e.job_level === "2층 대리" || e.job_level === "2층 매니저" || e.job_level === "2층 부점장";
-    const isFirstFloorAdmin = (e: Agentinfo) => e.job_level === "1층 대리" || e.job_level === "1층 매니저";
-    const isSecondFloorAdmin = (e: Agentinfo) =>
-      e.job_level === "2층 대리" || e.job_level === "2층 매니저" || e.job_level === "2층 부점장";
+    // 각 층 '대리급 이상' (점장 제외한 순수 층 리드)
+    const isFirstFloorLeadPure = (e: Agentinfo) =>
+      e.job_level === "1층 매니저" || e.job_level === "1층 대리";
+    const isSecondFloorLeadPure = (e: Agentinfo) =>
+      e.job_level === "2층 부점장" || e.job_level === "2층 매니저" || e.job_level === "2층 대리";
+
+    // 층별 커버리지(최소 인원 + 대리급 이상 1명)를 점장 유동 배치까지 고려해 만족하는지.
+    //  점장은 하루에 한 층만 채울 수 있으므로 '두 층이 동시에 부족'하면 불가.
+    const floorCoverageOk = (working: Agentinfo[]): boolean => {
+      const flex = working.filter(isDirector).length; // 유동 인원 (보통 점장 0~1명)
+      const ff = working.filter(isFirstFloor).length;
+      const sf = working.filter(isSecondFloor).length;
+      const ffL = working.filter(isFirstFloorLeadPure).length;
+      const sfL = working.filter(isSecondFloorLeadPure).length;
+      const floorOk = (bodies: number, leads: number, min: number) => bodies >= min && leads >= 1;
+
+      if (floorOk(ff, ffL, minFirstFloor) && floorOk(sf, sfL, minSecondFloor)) return true;
+      if (flex < 1) return false;
+      // 점장을 1층 또는 2층 한쪽에 투입 (인원 +1, 리드 +1)
+      const putFirst = floorOk(ff + 1, ffL + 1, minFirstFloor) && floorOk(sf, sfL, minSecondFloor);
+      const putSecond = floorOk(ff, ffL, minFirstFloor) && floorOk(sf + 1, sfL + 1, minSecondFloor);
+      return putFirst || putSecond;
+    };
+
+    //#################### 0-4. 필수 근무일 (해당 인원은 이 날 절대 휴무 배정 금지)
+    //  mandatoryWorkList : { title: 이름, start: 'YYYY-MM-DD' }[] — 대상 월만 반영
+    const mandatoryWorkSet: { [name: string]: Set<string> } = {};
+    mandatoryWorkList.forEach(({ title, start }: EventInput) => {
+      if (!title || !start) return;
+      const date = start.toString();
+      if (date.includes("NaN")) return;
+      const [y, m] = date.split("-").map(Number);
+      if (y !== targetYear || m !== targetMonth) return;
+      if (!mandatoryWorkSet[title]) mandatoryWorkSet[title] = new Set<string>();
+      mandatoryWorkSet[title].add(date);
+    });
+    const isMandatoryWork = (name: string, date: string) =>
+      !!mandatoryWorkSet[name] && mandatoryWorkSet[name].has(date);
 
     //#################### 1. 사전 확정 휴무 (결정적: 모든 시도에서 동일)
     //  - leaveList        : 직원 신청 휴무   → 의무 휴무 카운트에 포함
@@ -142,6 +199,7 @@ function App() {
         if (date.includes("NaN")) return;
         const [y, m, d] = date.split("-").map(Number);
         if (y !== targetYear || m !== targetMonth) return; // 대상 월만 반영
+        if (isMandatoryWork(title, date)) return; // 필수 근무일은 휴무 신청보다 우선
         if (baseLeaveSchedule[title].includes(date)) return;
         baseLeaveSchedule[title].push(date);
         if (countsTowardQuota) baseLeaveCounter[title] += 1;
@@ -171,88 +229,73 @@ function App() {
         lastLeaveDay[emp.name] = -minWorkGap;
       });
 
-      // 특정 인원을 그 날 쉬게 해도 매장 운영 조건이 유지되는지 검사
+      // member 를 그 날 쉬게 했을 때 남는 근무 인원이 매장 운영 조건을 만족하는지 검사.
+      //  유일한 절대 조건 = 인원별 의무 휴일. 그 외는 최대한만 맞춘다.
+      //  strict = true  : 일반 조건 (층·책임급·리드 최소 + 점장·부점장 1명 + subjob 겹침 방지 + 목표 근무 인원)
+      //  strict = false : 예외(채우기·막판·강제휴무) - "최소 근무 인원(목표 - 1, 주말은 +1 이 목표에 반영됨)" 만 확인
       const checkConditionToLeave = (
         date: string,
         dailyWorkforce: Agentinfo[],
         member: Agentinfo,
-        checkworkingday: boolean,
-        limitWorkingMember: number
+        strict: boolean
       ): boolean => {
         const day = parseInt(date.split("-")[2]);
-        const tempWorkforce = dailyWorkforce.filter((emp) => !offDutyEmployees[date].includes(emp.name));
+        const temp = dailyWorkforce.filter((emp) => !offDutyEmployees[date].includes(emp.name));
+        const minHeadcount = workTargetOf(day) - 1; // 완화 시 최소 근무 인원 (평일 목표-1 / 주말 목표-1)
 
-        const mainAdmin = tempWorkforce.filter(isMainAdmin).length;
-        const subAdmin = tempWorkforce.filter(isSubAdmin).length;
-        const managers = tempWorkforce.filter(isManager).length;
-        const firstFloor = tempWorkforce.filter(isFirstFloor).length;
-        const secondFloor = tempWorkforce.filter(isSecondFloor).length;
-        const firstFloorAdmin = tempWorkforce.filter(isFirstFloorAdmin).length;
-        const secondFloorAdmin = tempWorkforce.filter(isSecondFloorAdmin).length;
-        const subjobpart1 = tempWorkforce.filter(
-          (emp) => emp.name === selectedSubjob1[0] || emp.name === selectedSubjob1[1]
-        ).length;
-        const subjobpart2 = tempWorkforce.filter(
-          (emp) => emp.name === selectedSubjob2[0] || emp.name === selectedSubjob2[1]
-        ).length;
+        // ── 4일 연속 근무 초과자 강제 휴무 / 완화 단계: 최소 근무 인원만 ──
+        const forcedRest =
+          lastLeaveDay[member.name] > 0 && day - lastLeaveDay[member.name] >= maxWorkGap;
+        if (forcedRest || !strict) return temp.length >= minHeadcount;
 
-        const meetsBaseline =
-          subAdmin >= 1 && mainAdmin >= 1 && managers >= minManagers && tempWorkforce.length >= limitWorkingMember;
+        // ── 일반(strict) 조건 ──
+        const topAdmin = temp.filter(isTopAdmin).length;       // 점장·부점장
+        const seniors = temp.filter(isSenior).length;          // 책임급 (매니저 포함)
+        const subjob1Left = temp.filter((emp) => selectedSubjob1.includes(emp.name)).length;
+        const subjob2Left = temp.filter((emp) => selectedSubjob2.includes(emp.name)).length;
 
-        // 1) 최소 운영조건만 확인
-        if (!checkworkingday) return meetsBaseline;
+        if (!floorCoverageOk(temp)) return false;              // 층별 최소 인원·리드 (점장 유동 배치 반영)
+        if (seniors < minSeniors) return false;                // 책임급 최소
+        if (topAdmin < 1) return false;                        // 점장 또는 부점장 최소 1명
+        if (selectedSubjob1.includes(member.name) && subjob1Left < 1) return false; // 동일 subjob 겹침 방지
+        if (selectedSubjob2.includes(member.name) && subjob2Left < 1) return false;
+        if (temp.length < workTargetOf(day)) return false;     // 목표 근무 인원 (평일/주말)
 
-        // 2) 연속 근무가 maxWorkGap 이상이면 최소조건만 만족하면 강제 휴무 허용
-        if (lastLeaveDay[member.name] > 0 && day - lastLeaveDay[member.name] >= maxWorkGap) {
-          return meetsBaseline;
-        }
-
-        // 3) 직급별 상세 조건
-        let ok = true;
-        switch (member.job_level) {
-          case "점장":
-            if (mainAdmin < 1 || tempWorkforce.length < limitWorkingMember || managers < minManagers) ok = false;
-            break;
-          case "2층 부점장":
-            if (
-              mainAdmin < 1 || tempWorkforce.length < limitWorkingMember || managers < minManagers ||
-              subAdmin < 1 || secondFloor < minSecondFloor || secondFloorAdmin < 1
-            ) ok = false;
-            break;
-          case "2층 매니저":
-            if (
-              tempWorkforce.length < limitWorkingMember || subAdmin < 1 || managers < minManagers ||
-              secondFloor < minSecondFloor || secondFloorAdmin < 1
-            ) ok = false;
-            break;
-          case "1층 매니저":
-            if (
-              tempWorkforce.length < limitWorkingMember || subAdmin < 1 || managers < minManagers ||
-              firstFloor < minFirstFloor || firstFloorAdmin < 1
-            ) ok = false;
-            break;
-          case "2층 대리":
-            if (tempWorkforce.length < limitWorkingMember || secondFloor < minSecondFloor || secondFloorAdmin < 1) ok = false;
-            break;
-          case "1층 대리":
-            if (tempWorkforce.length < limitWorkingMember || firstFloor < minFirstFloor || firstFloorAdmin < 1) ok = false;
-            break;
-          case "2층 사원":
-            if (tempWorkforce.length < limitWorkingMember || secondFloor < minSecondFloor) ok = false;
-            break;
-          case "1층 사원":
-            if (tempWorkforce.length < limitWorkingMember || firstFloor < minFirstFloor) ok = false;
-            break;
-        }
-
-        // 보조직무 명단에 포함되는 인원만 확인
-        if (selectedSubjob1.includes(member.name) && subjobpart1 < 1) ok = false;
-        else if (selectedSubjob2.includes(member.name) && subjobpart2 < 1) ok = false;
-
-        return ok;
+        return true;
       };
 
-      //#################### 2-1. 날짜별로 랜덤 휴무 배정 (근무 간격 및 조건 고려)
+      //#################### 근무 간격 / 분산 헬퍼 (employeeleaveSchedule 를 진실의 원천으로 사용)
+      const targetWorkGap = minWorkGap + 1; // 목표 cadence: minWorkGap 일 근무 후 휴무
+
+      const leaveDayNums = (name: string): number[] =>
+        employeeleaveSchedule[name]
+          .map((ds) => parseInt(ds.split("-")[2], 10))
+          .filter((n) => !Number.isNaN(n));
+
+      // day 와 가장 가까운 기존 휴무일 사이의 간격 (없으면 큰 값)
+      const nearestLeaveGap = (name: string, day: number): number => {
+        let best = 999;
+        for (const d of leaveDayNums(name)) best = Math.min(best, Math.abs(d - day));
+        return best;
+      };
+      // day 이전(과거) 가장 최근 휴무로부터의 경과 일수.
+      //  이전 달 근무 이력을 알 수 없어 월초엔 -minWorkGap 기준(=자유롭게 배정 가능)
+      const daysSinceLeave = (name: string, day: number): number => {
+        let last = -minWorkGap;
+        for (const d of leaveDayNums(name)) if (d < day) last = Math.max(last, d);
+        return day - last;
+      };
+      // 강제 휴무 판정용: 이번 달 실제 휴무 or 월초(=0) 기준으로 연속 근무일 계산
+      const consecutiveWorkDays = (name: string, day: number): number => {
+        let last = 0;
+        for (const d of leaveDayNums(name)) if (d < day) last = Math.max(last, d);
+        return day - last - 1;
+      };
+      // day 에 추가로 쉬게 해도 최소 근무 간격이 지켜지는가 (양방향)
+      const spacingOk = (name: string, day: number): boolean =>
+        nearestLeaveGap(name, day) >= minWorkGap;
+
+      //#################### 2-1. 날짜별로 휴무 배정 (오래 못 쉰 사람 우선 + 근무 간격 준수)
       for (let day = 1; day <= daysInMonth; day++) {
         if (offday.includes(day)) continue; // 전체 휴무일은 근무/휴무 개념 없음
         const date = dateOf(day);
@@ -266,74 +309,106 @@ function App() {
           }
         });
 
-        // 휴무 후보군: 의무휴무 미달 + 최소 연속근무 충족 + 다음날 사전휴무 없음 + 오늘 사전휴무 아님
-        let remainingEmployees = agentData.filter(
-          (emp) =>
-            leaveCounter[emp.name] < maxLeavesPerEmployee &&
-            day - lastLeaveDay[emp.name] >= minWorkGap &&
-            !allLeaves.some((lv) => lv.name === emp.name && lv.day === day + 1) &&
-            !employeeleaveSchedule[emp.name].includes(date)
-        );
-
         // 사전휴무 인원을 제외한 전체 근무 가능 인원
         const dailyWorkforce = agentData.filter((emp) => !employeeleaveSchedule[emp.name].includes(date));
 
-        //#################### 2-2. 최대 연속 근무일 도달자 우선 강제 휴무
-        const forced = remainingEmployees.filter(
-          (emp) => lastLeaveDay[emp.name] > 0 && day - lastLeaveDay[emp.name] >= maxWorkGap
+        // 기본 후보군: 점장 제외 + 의무휴무 미달 + 오늘 사전휴무 아님 + 최소 근무 간격 준수 + 필수 근무일 아님
+        const baseCandidates = agentData.filter(
+          (emp) =>
+            !isDirector(emp) &&
+            leaveCounter[emp.name] < maxLeavesPerEmployee &&
+            !employeeleaveSchedule[emp.name].includes(date) &&
+            !isMandatoryWork(emp.name, date) &&
+            spacingOk(emp.name, day)
         );
-        forced.forEach((emp) => {
-          offDutyEmployees[date].push(emp.name);
-          if (!checkConditionToLeave(date, dailyWorkforce, emp, true, avgDailyEmployees - 1)) {
-            offDutyEmployees[date].pop();
-          } else {
-            leaveCounter[emp.name] += 1;
-            lastLeaveDay[emp.name] = day;
-            employeeleaveSchedule[emp.name].push(date);
-            allLeaves.push({ name: emp.name, date, day });
-          }
-        });
-        const forcedSet = new Set(forced.map((e) => e.name));
-        remainingEmployees = remainingEmployees.filter((emp) => !forcedSet.has(emp.name));
+        const assigned = new Set<string>();
 
-        //#################### 2-3. 휴가 가능 인원 중 랜덤 픽으로 목표 인원까지 배정
-        while (offDutyEmployees[date].length < dailyLeaveTarget && remainingEmployees.length > 0) {
-          const idx = randInt(remainingEmployees.length);
-          const picked = remainingEmployees[idx];
-          remainingEmployees.splice(idx, 1); // 뽑은 인원은 후보에서 제거 (재검토 X)
+        const commitLeave = (emp: Agentinfo) => {
+          leaveCounter[emp.name] += 1;
+          lastLeaveDay[emp.name] = day;
+          employeeleaveSchedule[emp.name].push(date);
+          allLeaves.push({ name: emp.name, date, day });
+          assigned.add(emp.name);
+        };
 
-          offDutyEmployees[date].push(picked.name);
-          if (!checkConditionToLeave(date, dailyWorkforce, picked, true, avgDailyEmployees)) {
-            offDutyEmployees[date].pop();
-            continue;
+        //#################### 2-2. 연속 근무 한계(maxWorkGap-1일) 도달자 강제 휴무
+        //  의무휴무 소진 여부·목표 간격과 무관하게, 최소 근무 인원만 지켜지면 무조건 쉬게 한다.
+        agentData
+          .filter(
+            (emp) =>
+              !isDirector(emp) &&
+              !employeeleaveSchedule[emp.name].includes(date) &&
+              !isMandatoryWork(emp.name, date) &&
+              consecutiveWorkDays(emp.name, day) >= maxWorkGap - 1
+          )
+          .sort((a, b) => consecutiveWorkDays(b.name, day) - consecutiveWorkDays(a.name, day))
+          .forEach((emp) => {
+            if (assigned.has(emp.name)) return;
+            offDutyEmployees[date].push(emp.name);
+            if (!checkConditionToLeave(date, dailyWorkforce, emp, false)) offDutyEmployees[date].pop();
+            else commitLeave(emp);
+          });
+
+        //#################### 2-3. 목표 휴무 인원까지 배정 — 오래 못 쉰 사람부터
+        //  1순위: 목표 간격(targetWorkGap) 지난 사람 / 2순위: 최소 간격만 지난 사람
+        const fillToTarget = (minGap: number) => {
+          while (offDutyEmployees[date].length < leaveTargetOf(day)) {
+            const pool = baseCandidates
+              .filter((emp) => !assigned.has(emp.name) && daysSinceLeave(emp.name, day) >= minGap)
+              .sort((a, b) => daysSinceLeave(b.name, day) - daysSinceLeave(a.name, day));
+            if (pool.length === 0) break;
+            // 간격이 비슷한 상위권(±1) 중 랜덤으로 1명
+            const topGap = daysSinceLeave(pool[0].name, day);
+            const top = pool.filter((e) => daysSinceLeave(e.name, day) >= topGap - 1);
+            const picked = top[randInt(top.length)];
+
+            offDutyEmployees[date].push(picked.name);
+            if (!checkConditionToLeave(date, dailyWorkforce, picked, true)) {
+              offDutyEmployees[date].pop();
+              assigned.add(picked.name); // 이 날은 불가 → 후보에서 제외
+              continue;
+            }
+            commitLeave(picked);
           }
-          leaveCounter[picked.name] += 1;
-          lastLeaveDay[picked.name] = day;
-          employeeleaveSchedule[picked.name].push(date);
-          allLeaves.push({ name: picked.name, date, day });
-        }
+        };
+        fillToTarget(targetWorkGap);
+        fillToTarget(minWorkGap);
       }
 
-      //#################### 3. 휴무 인원이 적은 날부터 채우기
-      const fillSparseDays = (skipAlternative: boolean) => {
-        for (let level = 0; level < dailyLeaveTarget; level++) {
+      //#################### 3. 휴무 인원이 적은 날부터 채우기 (근무 간격 준수 · 휴무 적은 사람 우선)
+      const fillSparseDays = () => {
+        for (let level = 0; level < maxDailyLeave; level++) {
           for (const date in offDutyEmployees) {
             const day = parseInt(date.split("-")[2]);
             if (offday.includes(day)) continue;
-            if (skipAlternative && alteroffday.includes(day)) continue;
             if (offDutyEmployees[date].length !== level) continue;
 
-            const candidates = agentData.filter((emp) => !offDutyEmployees[date].includes(emp.name));
             const dailyWorkforce = agentData.filter((emp) => !employeeleaveSchedule[emp.name].includes(date));
+            const tried = new Set<string>();
 
-            while (offDutyEmployees[date].length < dailyLeaveTarget && candidates.length > 0) {
-              const idx = randInt(candidates.length);
-              const picked = candidates[idx];
-              candidates.splice(idx, 1); // 한 번만 제거
-              if (leaveCounter[picked.name] >= maxLeavesPerEmployee) continue;
+            while (offDutyEmployees[date].length < leaveTargetOf(day)) {
+              const pool = agentData
+                .filter(
+                  (emp) =>
+                    !isDirector(emp) &&
+                    !tried.has(emp.name) &&
+                    !offDutyEmployees[date].includes(emp.name) &&
+                    !isMandatoryWork(emp.name, date) &&
+                    leaveCounter[emp.name] < maxLeavesPerEmployee &&
+                    spacingOk(emp.name, day)
+                )
+                // 휴무가 적은 사람 → 기존 휴무와 멀리 떨어진 날 우선
+                .sort(
+                  (a, b) =>
+                    leaveCounter[a.name] - leaveCounter[b.name] ||
+                    nearestLeaveGap(b.name, day) - nearestLeaveGap(a.name, day)
+                );
+              if (pool.length === 0) break;
+              const picked = pool[randInt(Math.min(3, pool.length))];
+              tried.add(picked.name);
 
               offDutyEmployees[date].push(picked.name);
-              if (!checkConditionToLeave(date, dailyWorkforce, picked, false, avgDailyEmployees - 1)) {
+              if (!checkConditionToLeave(date, dailyWorkforce, picked, false)) {
                 offDutyEmployees[date].pop();
                 continue;
               }
@@ -345,38 +420,100 @@ function App() {
           }
         }
       };
-      fillSparseDays(false);
+      fillSparseDays();
 
-      //#################### 4. 대체 휴무: 해당일 근무자에게 휴무 크레딧 1일 부여 후 재보충
-      alteroffday.forEach((day) => {
-        const date = dateOf(day);
-        const worked = agentData.filter((emp) => !employeeleaveSchedule[emp.name].includes(date));
-        worked.forEach((emp) => {
-          leaveCounter[emp.name] -= 1;
-        });
+      //#################### 4. 대체 휴무: 공휴일(alteroffday)에 근무한 인원은 그만큼 의무 휴무가 늘어난다
+      const holidayCredit: { [key: string]: number } = {};
+      agentData.forEach((emp) => {
+        holidayCredit[emp.name] = isDirector(emp)
+          ? 0
+          : alteroffday.filter((d) => !employeeleaveSchedule[emp.name].includes(dateOf(d))).length;
       });
-      fillSparseDays(true);
+      const quotaOf = (name: string) => maxLeavesPerEmployee + (holidayCredit[name] || 0);
 
-      //#################### 5. 의무 휴무가 남은 인원은 랜덤 날짜에 조건 확인 후 배치
+      //#################### 5. 의무 휴무(+대체 휴무) 미달 인원 배치 (점장 제외)
+      //  기존 휴무와 가장 멀고 그 날 휴무자가 적은 날부터. 1차는 최소 간격 준수, 못 채우면 간격 완화(≥2).
       agentData.forEach((employee) => {
-        let attempts = 0;
-        while (leaveCounter[employee.name] < maxLeavesPerEmployee && attempts < 300) {
-          attempts++;
-          const day = randInt(daysInMonth) + 1; // 1 ~ daysInMonth (마지막 날 포함)
-          if (offday.includes(day) || alteroffday.includes(day)) continue;
-          const date = dateOf(day);
-          if (employeeleaveSchedule[employee.name].includes(date)) continue;
+        if (isDirector(employee)) return;
+        const failed = new Set<number>();
+        let guard = 0;
+        for (const minGap of [minWorkGap, 2]) {
+          while (leaveCounter[employee.name] < quotaOf(employee.name) && guard++ < 400) {
+            const dayCandidates: { day: number; date: string; gap: number; occ: number }[] = [];
+            for (let day = 1; day <= daysInMonth; day++) {
+              if (offday.includes(day) || alteroffday.includes(day) || failed.has(day)) continue;
+              const date = dateOf(day);
+              if (employeeleaveSchedule[employee.name].includes(date)) continue;
+              if (isMandatoryWork(employee.name, date)) continue;
+              if (nearestLeaveGap(employee.name, day) < minGap) continue;
+              dayCandidates.push({
+                day,
+                date,
+                gap: nearestLeaveGap(employee.name, day),
+                occ: offDutyEmployees[date]?.length ?? 0,
+              });
+            }
+            if (dayCandidates.length === 0) break;
+            // 기존 휴무와 멀리 떨어지고(gap 큼) 그 날 휴무자가 적은(occ 작음) 날 우선
+            dayCandidates.sort((a, b) => b.gap - a.gap || a.occ - b.occ);
+            const choice = dayCandidates[randInt(Math.min(3, dayCandidates.length))];
 
-          employeeleaveSchedule[employee.name].push(date);
-          const dailyWorkforce = agentData.filter((emp) => !employeeleaveSchedule[emp.name].includes(date));
-          if (checkConditionToLeave(date, dailyWorkforce, employee, false, minDailyEmployees)) {
-            leaveCounter[employee.name] += 1;
-            lastLeaveDay[employee.name] = day;
-            allLeaves.push({ name: employee.name, date, day });
-            if (!offDutyEmployees[date]) offDutyEmployees[date] = [];
-            offDutyEmployees[date].push(employee.name);
-          } else {
-            employeeleaveSchedule[employee.name].pop();
+            employeeleaveSchedule[employee.name].push(choice.date);
+            const dailyWorkforce = agentData.filter((emp) => !employeeleaveSchedule[emp.name].includes(choice.date));
+            if (checkConditionToLeave(choice.date, dailyWorkforce, employee, false)) {
+              leaveCounter[employee.name] += 1;
+              lastLeaveDay[employee.name] = choice.day;
+              allLeaves.push({ name: employee.name, date: choice.date, day: choice.day });
+              if (!offDutyEmployees[choice.date]) offDutyEmployees[choice.date] = [];
+              offDutyEmployees[choice.date].push(employee.name);
+            } else {
+              employeeleaveSchedule[employee.name].pop();
+              failed.add(choice.day);
+            }
+          }
+        }
+      });
+
+      //#################### 5-1. 연속 근무 5일 이상 구간 잘라내기 (최대 4일 연속 근무 규칙)
+      //  각 인원의 휴무 사이(그리고 월초~첫휴무, 마지막휴무~월말) 간격이 maxWorkGap 이상이면
+      //  그 구간 안에 하루 휴무를 끼워 넣는다. 최소 근무 인원만 지켜지면 배치.
+      agentData.forEach((emp) => {
+        if (isDirector(emp)) return;
+        let guard = 0;
+        let progressed = true;
+        while (progressed && guard++ < 80) {
+          progressed = false;
+          const marks = [0, ...leaveDayNums(emp.name).sort((a, b) => a - b), daysInMonth + 1];
+          for (let k = 0; k < marks.length - 1; k++) {
+            const from = marks[k];
+            const to = marks[k + 1];
+            if (to - from - 1 < maxWorkGap) continue; // 연속 근무 4일 이하 → OK
+
+            // 구간 중앙에서 바깥쪽으로 탐색하며 배치 가능한 근무일을 찾는다
+            const mid = Math.round((from + to) / 2);
+            let placed = false;
+            for (let step = 0; step <= to - from && !placed; step++) {
+              for (const cand of step === 0 ? [mid] : [mid - step, mid + step]) {
+                if (cand <= from || cand >= to) continue;
+                if (offday.includes(cand)) continue;
+                const date = dateOf(cand);
+                if (isMandatoryWork(emp.name, date)) continue;
+                if (employeeleaveSchedule[emp.name].includes(date)) continue;
+                employeeleaveSchedule[emp.name].push(date);
+                const dw = agentData.filter((e) => !employeeleaveSchedule[e.name].includes(date));
+                if (checkConditionToLeave(date, dw, emp, false)) {
+                  leaveCounter[emp.name] += 1;
+                  lastLeaveDay[emp.name] = cand;
+                  allLeaves.push({ name: emp.name, date, day: cand });
+                  if (!offDutyEmployees[date]) offDutyEmployees[date] = [];
+                  offDutyEmployees[date].push(emp.name);
+                  placed = true;
+                  progressed = true;
+                } else {
+                  employeeleaveSchedule[emp.name].pop();
+                }
+              }
+            }
           }
         }
       });
@@ -389,14 +526,18 @@ function App() {
     const scoreAttempt = (st: AttemptState): number => {
       let penalty = 0;
 
-      // (1) 의무 휴무 쿼터 미달/초과
+      // (1) 의무 휴무(+공휴일 근무 대체휴무) 쿼터 미달/초과 (점장 제외)
       agentData.forEach((emp) => {
-        const diff = st.leaveCounter[emp.name] - maxLeavesPerEmployee;
-        if (diff < 0) penalty += -diff * 1000; // 미달: 매우 나쁨
+        if (isDirector(emp)) return;
+        const credit = alteroffday.filter(
+          (d) => !st.employeeleaveSchedule[emp.name].includes(dateOf(d))
+        ).length;
+        const diff = st.leaveCounter[emp.name] - (maxLeavesPerEmployee + credit);
+        if (diff < 0) penalty += -diff * 1000; // 미달(대체휴무 미부여 포함): 매우 나쁨
         else if (diff > 0) penalty += diff * 400; // 초과
       });
 
-      // (2) 일자별 근무 인원 / 매장 조건 + 휴무 분포
+      // (2) 일자별 근무 인원 / 매장 조건 + 휴무 분포 + subjob 겹침
       const offCounts: number[] = [];
       for (let day = 1; day <= daysInMonth; day++) {
         if (offday.includes(day)) continue;
@@ -407,42 +548,62 @@ function App() {
         );
         offCounts.push(agentData.length - working.length);
 
-        if (working.length < minDailyEmployees) penalty += (minDailyEmployees - working.length) * 600;
-        const managers = working.filter(isManager).length;
-        if (managers < minManagers) penalty += (minManagers - managers) * 500;
-        if (working.filter(isMainAdmin).length < 1) penalty += 500;
-        if (working.filter(isSubAdmin).length < 1) penalty += 500;
-        const ff = working.filter(isFirstFloor).length;
-        if (ff < minFirstFloor) penalty += (minFirstFloor - ff) * 250;
-        const sf = working.filter(isSecondFloor).length;
-        if (sf < minSecondFloor) penalty += (minSecondFloor - sf) * 250;
+        const target = workTargetOf(day);
+        if (working.length < target) penalty += (target - working.length) * 120;             // 목표 근무 인원 (soft)
+        if (working.length < target - 1) penalty += (target - 1 - working.length) * 600;     // 최소 근무 인원 (목표-1) 미달 (hard)
+        const seniors = working.filter(isSenior).length;
+        if (seniors < minSeniors) penalty += (minSeniors - seniors) * 500;
+        if (working.filter(isTopAdmin).length < 1) penalty += 400;                     // 점장·부점장 부재
+        if (!floorCoverageOk(working)) penalty += 500;                                 // 층별 최소 인원·리드 (점장 유동 반영)
+
+        // 동일 subjob 조 인원이 같은 날 모두 휴무면 벌점
+        const sub1Named: string[] = (selectedSubjob1 as string[]).filter((n) => !!n);
+        const sub2Named: string[] = (selectedSubjob2 as string[]).filter((n) => !!n);
+        if (sub1Named.length > 0 && !working.some((w) => sub1Named.includes(w.name))) penalty += 150;
+        if (sub2Named.length > 0 && !working.some((w) => sub2Named.includes(w.name))) penalty += 150;
       }
 
-      // (3) 휴무 인원 균등 분포 (분산이 작을수록 좋음)
+      // (3) 하루 휴무 인원 균등 분포 (분산이 작을수록 좋음)
       if (offCounts.length > 1) {
         const mean = offCounts.reduce((a, b) => a + b, 0) / offCounts.length;
         const variance = offCounts.reduce((a, b) => a + (b - mean) ** 2, 0) / offCounts.length;
-        penalty += variance * 30;
+        penalty += variance * 45;
       }
 
-      // (4) 연속 근무 초과 (maxWorkGap 를 넘겨 일하는 구간)
+      // (4) 인원별 연속 근무일: 목표 3일 이하, 예외 4일, 5일 이상은 심각
+      const maxStreakAllowed = maxWorkGap - 1; // 4일
       agentData.forEach((emp) => {
+        if (isDirector(emp)) return;
         const leaveDays = st.employeeleaveSchedule[emp.name]
           .map((d) => parseInt(d.split("-")[2]))
           .filter((d) => !Number.isNaN(d))
           .sort((a, b) => a - b);
         let prev = 0;
-        [...leaveDays, daysInMonth + 1].forEach((d) => {
-          const streak = d - prev - 1;
-          if (streak > maxWorkGap) penalty += (streak - maxWorkGap) * 60;
+        [...leaveDays, daysInMonth + 1].forEach((d, i) => {
+          const streak = d - prev - 1; // 이 구간의 연속 근무일수 (월초~첫휴무, 마지막휴무~월말 포함)
+          const isInner = prev > 0 && i < leaveDays.length;
+          if (streak > maxStreakAllowed) {
+            penalty += (streak - maxStreakAllowed) * 300; // 5일 이상 연속근무: 매우 나쁨 (구간 위치 무관)
+          } else if (streak === maxStreakAllowed) {
+            penalty += 25; // 4일 연속: 예외적 허용, 소폭 억제
+          } else if (isInner && streak < minWorkGap) {
+            penalty += (minWorkGap - streak) * 40; // 휴무 몰림
+          }
           prev = d;
         });
+        // 휴무일 간격의 불균일함(분산)도 벌점
+        if (leaveDays.length >= 2) {
+          const gaps = leaveDays.slice(1).map((d, i) => d - leaveDays[i]);
+          const gmean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+          const gvar = gaps.reduce((a, b) => a + (b - gmean) ** 2, 0) / gaps.length;
+          penalty += gvar * 12;
+        }
       });
 
       return penalty;
     };
 
-    const ATTEMPTS = 40;
+    const ATTEMPTS = 60;
     let best: AttemptState | null = null;
     let bestScore = Infinity;
     for (let i = 0; i < ATTEMPTS; i++) {
@@ -456,21 +617,33 @@ function App() {
     if (!best) return;
     log("best score", bestScore, "/ attempts", ATTEMPTS);
 
-    //#################### 7. 날짜순 정렬 후 인원별 휴무 카운트 라벨링
+    //#################### 7. 날짜순 정렬 후 인원별 휴무 유형 분류 (일반 / 대체 / 연차)
     const { allLeaves } = best;
     allLeaves.sort((a, b) => a.day - b.day);
-    const result: EventInput[] = [];
-    const tempLeaveCounter: { [key: string]: number } = {};
-    allLeaves.forEach(({ name, date }) => {
-      tempLeaveCounter[name] = (tempLeaveCounter[name] || 0) + 1;
-      const jobLevel = agentData.find((emp) => emp.name === name)?.job_level || "";
-      result.push({ title: `${name} (${tempLeaveCounter[name]}일)`, start: date, color: jobLevelColors[jobLevel] });
+
+    // 대상 월 연차 신청일 (name|date)
+    const annualKeySet = new Set<string>();
+    annualLeaveList.forEach(({ title, start }: EventInput) => {
+      if (!title || !start) return;
+      const d = start.toString();
+      const [y, m] = d.split("-").map(Number);
+      if (y === targetYear && m === targetMonth) annualKeySet.add(`${title}|${d}`);
     });
-    log("Result allLeaves : ", allLeaves);
-    log("Result tempLeaveCounter : ", tempLeaveCounter);
+
+    // 인원별로 날짜순 누계: 연차 제외, 의무 휴무일수(maxLeavesPerEmployee) 초과분은 '대체'
+    const obligatoryCount: { [key: string]: number } = {};
+    const tagged = allLeaves.map(({ name, date }) => {
+      if (annualKeySet.has(`${name}|${date}`)) {
+        return { name, date, type: "annual" as const };
+      }
+      obligatoryCount[name] = (obligatoryCount[name] || 0) + 1;
+      const type = obligatoryCount[name] > maxLeavesPerEmployee ? ("comp" as const) : ("leave" as const);
+      return { name, date, type };
+    });
+    log("Result tagged : ", tagged);
 
     // 결과는 화면에만 반영 (확정 전까지 서버 저장 안 됨)
-    setGeneratedLeaves(allLeaves.map(({ name, date }) => ({ name, date })));
+    setGeneratedLeaves(tagged);
     setGeneratedMonth(ym);
   };
 
@@ -487,33 +660,72 @@ function App() {
   };
 
   // 달력에 표시할 이벤트: 이번 달을 방금 생성했으면 그 제안, 아니면 서버 저장본
+  //  draggable=true (미리보기)이면 일반/대체 휴무는 드래그 이동 가능, 연차는 표에서만 수정
   const buildCalendarEvents = (
-    items: { name: string; date: string; jobLevel?: string; type?: string }[]
+    items: { name: string; date: string; jobLevel?: string; type?: string }[],
+    draggable = false
   ): EventInput[] => {
+    // 괄호 안 숫자 = 그 달의 누적 휴무일 (일반 + 대체 포함, 연차는 제외)
     const perPerson: { [key: string]: number } = {};
     return [...items]
       .filter((i) => i.date)
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((i) => {
-        perPerson[i.name] = (perPerson[i.name] || 0) + 1;
         const jobLevel =
           i.jobLevel || agentData.find((emp) => emp.name === i.name)?.job_level || "";
-        const label = i.type === "annual" ? " 연차" : "";
-        return {
-          title: `${i.name} (${perPerson[i.name]}일)${label}`,
+        const color = jobLevelColors[jobLevel];
+        const ltype = (i.type as "leave" | "comp" | "annual") || "leave";
+        const common = {
+          id: `${i.name}|${i.date}`,
           start: i.date,
-          color: jobLevelColors[jobLevel],
+          color,
+          extendedProps: { name: i.name, ltype },
+        };
+        // 연차: 누적 휴무에 포함하지 않고 숫자도 표기하지 않음, 드래그 불가
+        if (ltype === "annual") {
+          return { ...common, title: `${i.name} 연차`, editable: false };
+        }
+        perPerson[i.name] = (perPerson[i.name] || 0) + 1;
+        const label = ltype === "comp" ? " 대체" : "";
+        return {
+          ...common,
+          title: `${i.name} (${perPerson[i.name]}일)${label}`,
+          editable: draggable,
         };
       });
   };
 
+  // 미리보기(생성 후·확정 전) 상태인지 — 이때만 달력 드래그 이동을 허용
+  const isPreview =
+    !!generatedMonth && generatedMonth === currentMonth && generatedLeaves.length > 0;
+
   const calendarEvents = useMemo(() => {
-    if (generatedMonth && generatedMonth === currentMonth && generatedLeaves.length > 0) {
-      return buildCalendarEvents(generatedLeaves);
+    if (isPreview) {
+      return buildCalendarEvents(generatedLeaves, true);
     }
     return buildCalendarEvents(monthlySchedule);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generatedMonth, currentMonth, generatedLeaves, monthlySchedule, agentData]);
+  }, [isPreview, generatedLeaves, monthlySchedule, agentData]);
+
+  // 달력에서 휴무를 다른 날짜로 드래그 → 미리보기(generatedLeaves) 갱신.
+  //  확정 전이므로 별도 경고 없이 반영. 이후 '확정'을 누르면 이 값 그대로 저장됨.
+  const handleEventDrop = (info: EventDropArg) => {
+    const name: string = info.event.extendedProps?.name;
+    const oldDate = info.oldEvent.startStr; // "YYYY-MM-DD"
+    const newDate = info.event.startStr;
+    if (!name || !oldDate || !newDate || oldDate === newDate) return;
+
+    // 보이는 달 밖으로 이동 / 같은 사람이 그 날 이미 휴무 → 되돌림
+    const outOfMonth = !newDate.startsWith(`${currentMonth}-`);
+    const clash = generatedLeaves.some((l) => l.name === name && l.date === newDate);
+    if (outOfMonth || clash) {
+      info.revert();
+      return;
+    }
+    setGeneratedLeaves((prev) =>
+      prev.map((l) => (l.name === name && l.date === oldDate ? { ...l, date: newDate } : l))
+    );
+  };
 
   // 스케줄 초기화: 확정 저장 기록(monthly_leaves) 삭제 + 모든 직원의 원하는 휴일/연차 신청 비움
   const resetScheduleTable = async () => {
@@ -549,13 +761,13 @@ function App() {
 
     const monthPrefix = `${currentMonth}-`;
     const entries = agentList.map((agent: any) => {
-      const leaveDates = Array.from(
-        new Set(
-          generatedLeaves
-            .filter((l) => l.name === agent.name && l.date.startsWith(monthPrefix))
-            .map((l) => l.date)
-        )
+      const mine = generatedLeaves.filter(
+        (l) => l.name === agent.name && l.date.startsWith(monthPrefix)
       );
+      const datesOf = (t: "leave" | "comp") =>
+        Array.from(new Set(mine.filter((l) => l.type === t).map((l) => l.date)));
+      const leaveDates = datesOf("leave");
+      const compLeaveDates = datesOf("comp");
       const annualLeaveDates = Array.from(
         new Set(
           annualLeaveList
@@ -568,7 +780,7 @@ function App() {
             .map((e: EventInput) => e.start as string)
         )
       );
-      return { agentId: agent.id, leaveDates, annualLeaveDates };
+      return { agentId: agent.id, leaveDates, compLeaveDates, annualLeaveDates };
     });
 
     try {
@@ -590,7 +802,7 @@ function App() {
 
   return (
     <div className="App">
-      <MyCalendar events={calendarEvents} />
+      <MyCalendar events={calendarEvents} editable={isPreview} onEventDrop={handleEventDrop} />
       <div style={{ height: "10px" }}></div>
       <div style={{ display: 'flex', gap: '10px', marginLeft: '400px', marginTop: '10px' }}>
         <button onClick={genSch}> Generate </button>

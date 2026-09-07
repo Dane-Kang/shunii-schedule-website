@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `agent_informations` (
   `job_level` varchar(20) NOT NULL,
   `description` varchar(255) NOT NULL,
   `annualleave` varchar(255) NOT NULL,
+  `mandatory_workday` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`agent_information_id`)
 );
 
@@ -18,7 +19,7 @@ CREATE TABLE IF NOT EXISTS `monthly_leaves` (
   `agent_information_id` CHAR(36) NOT NULL,
   `schedule_month` CHAR(7) NOT NULL,                       -- 'YYYY-MM' (leave_date 가 속한 달)
   `leave_date` DATE NOT NULL,                              -- 'YYYY-MM-DD'
-  `leave_type` ENUM('leave', 'annual') NOT NULL DEFAULT 'leave',
+  `leave_type` ENUM('leave', 'annual', 'comp') NOT NULL DEFAULT 'leave',
   `confirmed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`monthly_leave_id`),
   UNIQUE KEY `uq_agent_date` (`agent_information_id`, `leave_date`),

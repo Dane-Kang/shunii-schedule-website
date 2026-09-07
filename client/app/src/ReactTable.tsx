@@ -13,6 +13,7 @@ export interface Agent {
   job_level: string;
   description: string;
   annualleave: string;
+  mandatory_workday: string;
   isNew?: boolean; // 추가된 행 여부를 나타내는 필드
   ischecked?: boolean;
 }
@@ -25,11 +26,13 @@ const Table: React.FC = () => {
     rows,
     selectedDates,
     selectedAnnualleave,
+    selectedMandatoryWork,
     handleCreateAgent,
     handleUpdateAgent,
     handleDeleteAgent,
     setSelectedDates,
     setSelectedAnnualleave,
+    setSelectedMandatoryWork,
     setSelectedDateList,
     scheduleEssentialWork,
     holiday,
@@ -50,22 +53,22 @@ const Table: React.FC = () => {
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null); // 확인 버튼에서 실행할 함수 저장
 
   // 수동으로 열 너비 설정
-  const columnWidths = [60, 130, 250, 250, 110];
+  const columnWidths = [60, 130, 250, 250, 250, 110];
 
   // 스케줄 관련 너비 , Header 설정
   const colWidthSetSchedule = [100, 100];
   const colWidthSetSchedule2 = [100, 150, 150, 150, 150];
   const headerNamesSetSchedule = ['전체 휴일','대체 휴일'];
-  const headerNamesSetSchedule2 = ['1인당 휴일','최소 근무 인원','필수 매니저↑ 수','필수 1층 사원 수', '필수 2층 사원 수'];
+  const headerNamesSetSchedule2 = ['1인당 휴일','평일 근무 인원(주말+1)','최소 책임급 수','필수 1층 인원', '필수 2층 인원'];
   
   const colWidthHeaderSubjobs = [160, 160];
   const colWidthSubjobs = [80, 80, 80, 80];
   const headerNamesSubjobs = ['온라인 업무','RT 업무'];
 
   // Header 이름 설정
-  const headerNames = ['이름','직무 등급','원하는 휴일', '연차 신청', '누적 사용 연차'];
+  const headerNames = ['이름','직무 등급','원하는 휴일', '연차 신청', '필수 근무일', '누적 사용 연차'];
   // 수동으로 열 수정 가능 여부 설정 (마지막 '누적 사용 연차'는 읽기 전용)
-  const editableColumns = [true, true, true, true, false];
+  const editableColumns = [true, true, true, true, true, false];
 
   const dataRef = useRef(data);
 
@@ -87,7 +90,7 @@ const Table: React.FC = () => {
 
   // 새로운 행 추가 함수
   const addRow = () => {
-    const newRow: Agent = { id: '', name: '', job_level: '', description: '', annualleave: ''}; // 기본값을 가진 새 행
+    const newRow: Agent = { id: '', name: '', job_level: '', description: '', annualleave: '', mandatory_workday: ''}; // 기본값을 가진 새 행
     setData([...data, newRow]);
   };
 
@@ -125,7 +128,8 @@ const Table: React.FC = () => {
             console.log("dataRef.current :", dataRef.current);
             row.description = dataRef.current[rowIndex].description;
             row.annualleave = dataRef.current[rowIndex].annualleave;
-            handleUpdateAgent(row.id, row.name, row.job_level, row.description, row.annualleave); // 확인 후 업데이트
+            row.mandatory_workday = dataRef.current[rowIndex].mandatory_workday;
+            handleUpdateAgent(row.id, row.name, row.job_level, row.description, row.annualleave, row.mandatory_workday); // 확인 후 업데이트
           });
           console.log("Update Existing Agent");
         }
@@ -134,14 +138,15 @@ const Table: React.FC = () => {
             console.log("dataRef.current :", dataRef.current);
             row.description = dataRef.current[rowIndex].description;
             row.annualleave = dataRef.current[rowIndex].annualleave;
-            handleCreateAgent(row.name, row.job_level, row.description, row.annualleave); // 확인 후 업데이트
+            row.mandatory_workday = dataRef.current[rowIndex].mandatory_workday;
+            handleCreateAgent(row.name, row.job_level, row.description, row.annualleave, row.mandatory_workday); // 확인 후 업데이트
           });
           console.log("Save New Agent");
         }
       }
       else{
         openModal("Delete??", () => {
-          handleDeleteAgent(row.id, row.name, row.job_level, row.description, row.annualleave); // 확인 후 업데이트
+          handleDeleteAgent(row.id, row.name, row.job_level, row.description, row.annualleave, row.mandatory_workday); // 확인 후 업데이트
         });
         console.log("Delete Agent");
       }
@@ -196,6 +201,29 @@ const Table: React.FC = () => {
       if(formattedDates.includes("NaN")) return;
       // 상태를 처리하는 함수 호출
       handleInputChange(rowIndex, 'annualleave', formattedDates);
+    }
+  };
+
+  const handleMW_DateChange = (rowIndex: number, dates: DateObject[]) => {
+    if(!selectedMandatoryWork[rowIndex]){
+      selectedMandatoryWork[rowIndex] = {name:"", date:[]};
+    }
+    selectedMandatoryWork[rowIndex].date = dates;
+    setSelectedMandatoryWork(selectedMandatoryWork);
+  };
+
+  const handleMW_DatePickerClose = (rowIndex: number) => { // DatePicker가 닫힐 때 호출되는 함수
+    if(selectedMandatoryWork[rowIndex]){
+      const formattedDates = selectedMandatoryWork[rowIndex].date.map((date: DateObject) => {
+          const dateInstance = date.toDate();
+          const year = dateInstance.getFullYear();
+          const month = dateInstance.getMonth() + 1;
+          const day = dateInstance.getDate();
+          return `${year}-`+ month.toString().padStart(2, "0") + `-`+ day.toString().padStart(2, "0");
+        })
+        .join(", ");
+      if(formattedDates.includes("NaN")) return;
+      handleInputChange(rowIndex, 'mandatory_workday', formattedDates);
     }
   };
 
@@ -384,7 +412,7 @@ const Table: React.FC = () => {
                   onChange={(e) => handleCheckboxChange(rowIndex, e.target.checked)}
                 />
               </td>
-              {['name', 'job_level', 'description', 'annualleave'].map((field, colIndex) => (
+              {['name', 'job_level', 'description', 'annualleave', 'mandatory_workday'].map((field, colIndex) => (
                 <td key={colIndex} style={{ width: `${columnWidths[colIndex]}px` }}>
                   {field === "job_level" ? (
                     <select
@@ -415,10 +443,22 @@ const Table: React.FC = () => {
                     />
                   ) : field === "annualleave" ? (
                     <DatePicker
-                    style={{ width: "250px" }} 
+                    style={{ width: "250px" }}
                       onChange={(dates: DateObject[]) => handle_AN_DateChange(rowIndex, dates)}
                       onClose={() => handle_AN_DatePickerClose(rowIndex)}
                       value={selectedAnnualleave[rowIndex]?.date || []}
+                      multiple
+                      readOnly={!editableColumns[colIndex]}
+                      format="MM/DD"
+                      calendarPosition="bottom-center"
+                      className="black"
+                    />
+                  ) : field === "mandatory_workday" ? (
+                    <DatePicker
+                      style={{ width: "250px" }}
+                      onChange={(dates: DateObject[]) => handleMW_DateChange(rowIndex, dates)}
+                      onClose={() => handleMW_DatePickerClose(rowIndex)}
+                      value={selectedMandatoryWork[rowIndex]?.date || []}
                       multiple
                       readOnly={!editableColumns[colIndex]}
                       format="MM/DD"
@@ -435,7 +475,7 @@ const Table: React.FC = () => {
                   )}
                 </td>
               ))}
-              <td style={{ width: `${columnWidths[4]}px`, textAlign: 'center' }}>
+              <td style={{ width: `${columnWidths[5]}px`, textAlign: 'center' }}>
                 {(annualLeaveUsage && annualLeaveUsage[row.id]) || 0}
               </td>
               {row.isNew && (

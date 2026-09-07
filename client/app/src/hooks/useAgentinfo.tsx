@@ -6,14 +6,41 @@ import { EventInput } from '@fullcalendar/core';
 // Context 생성
 const AgentContext = createContext<any>(null);
 
+// 직급 순서: 점장 > 부점장 > 매니저 > 대리 > 사원 (표에서 위쪽부터 이 순서로 표기)
+//  키워드 포함 여부로 판정 → 층 접두어("1층 "/"2층 ")나 옛 표기("매니저" 등), 유니코드 정규화 차이에도 견고
+const jobRank = (raw: unknown): number => {
+  const s = String(raw ?? "").normalize("NFC");
+  if (s.includes("부점장")) return 1; // "점장" 보다 먼저 검사
+  if (s.includes("점장")) return 0;
+  if (s.includes("매니저")) return 2;
+  if (s.includes("대리")) return 3;
+  if (s.includes("사원")) return 4;
+  return 98; // 미분류(빈 값/신규 행)는 맨 아래
+};
+const floorRank = (raw: unknown): number => {
+  const s = String(raw ?? "").normalize("NFC");
+  if (s.includes("1층")) return 0;
+  if (s.includes("2층")) return 1;
+  return 2;
+};
+const sortByJobRank = (list: any[] | undefined): any[] =>
+  [...(list ?? [])].sort(
+    (a, b) =>
+      jobRank(a?.job_level) - jobRank(b?.job_level) ||
+      floorRank(a?.job_level) - floorRank(b?.job_level)
+  );
+
 export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [rows, setRows] = useState<number>(0);
   const [agentList, setAgentList] = useState<any[] | undefined>(undefined);
   const [selectedDates, setSelectedDates] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
   const [selectedAnnualleave, setSelectedAnnualleave] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
+  const [selectedMandatoryWork, setSelectedMandatoryWork] = useState<{ [key: number]: {name:string; date:DateObject[]} }>({});
   const [leaveList, setLeaveList] = useState<EventInput[]>([]);
   const [annualLeaveList, setAnnualLeaveList] = useState<EventInput[]>([]);
-  const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,7,1,3,3]);
+  const [mandatoryWorkList, setMandatoryWorkList] = useState<EventInput[]>([]);
+  // [1인당 휴일, 평일 근무 인원(주말 +1), 최소 책임급 수, 필수 1층 인원, 필수 2층 인원]
+  const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,6,1,3,2]);
   const [holiday, setHoliday] = useState<DateObject[]>([]);
   const [alternativeholiday, setAlternativeholiday] = useState<DateObject[]>([]);
   const [selectedSubjob1, setSelectedSubjob1] = useState<string[]>([]);
@@ -22,14 +49,14 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [annualLeaveUsage, setAnnualLeaveUsage] = useState<{ [agentId: string]: number }>({}); // 인원별 누적 사용 연차
   // 현재 보고 있는 달의 확정 휴일/연차 (서버 저장본)
   const [monthlySchedule, setMonthlySchedule] = useState<
-    { agentId: string; name: string; jobLevel: string; date: string; type: "leave" | "annual" }[]
+    { agentId: string; name: string; jobLevel: string; date: string; type: "leave" | "annual" | "comp" }[]
   >([]);
   const appSettingsLoadedRef = useRef(false); // 서버 설정 최초 로드 완료 여부
 
   const handleCreateAgent = async (
-    name: string, joblevel: string, description: string, annualleave: string
+    name: string, joblevel: string, description: string, annualleave: string, mandatoryworkday: string
   ) => {
-    const data = { name, joblevel, description, annualleave};
+    const data = { name, joblevel, description, annualleave, mandatoryworkday };
     console.log('handleCreateAgent data',data);
     const result = await agentAPI.createAgentinfo(data);
     if (result.statusCode === 400) {
@@ -41,9 +68,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleUpdateAgent = async (id:string,
-    name: string, joblevel: string, description: string, annualleave: string
+    name: string, joblevel: string, description: string, annualleave: string, mandatoryworkday: string
   ) => {
-    const data = { name, joblevel, description, annualleave};
+    const data = { name, joblevel, description, annualleave, mandatoryworkday };
     console.log('handleUpdateAgent data',data, 'id ',id);
     const result = await agentAPI.updateAgentinfo(id, data);
     if (result.statusCode === 400) {
@@ -55,9 +82,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleDeleteAgent = async (id:string,
-    name: string, joblevel: string, description: string, annualleave: string
+    name: string, joblevel: string, description: string, annualleave: string, mandatoryworkday: string
   ) => {
-    const data = { name, joblevel, description, annualleave};
+    const data = { name, joblevel, description, annualleave, mandatoryworkday };
     console.log('deleteAgentinfo data',data, 'id ',id);
     
     const result = await agentAPI.deleteAgentinfo(id, data);
@@ -72,7 +99,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const syncAgentList = async () => {
     console.log("syncAgentList");
     const result = await agentAPI.getAgentinfo();
-    setAgentList(result.agentinfos);
+    setAgentList(sortByJobRank(result.agentinfos));
     const count = await agentAPI.getAgentCount();
     setRows(count.response);
   };
@@ -116,7 +143,12 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   // 확정된 월 스케줄을 서버에 저장 (인원 x 월 별 통째 교체)
   const confirmSchedule = async (
     scheduleMonth: string,
-    entries: { agentId: string; leaveDates: string[]; annualLeaveDates: string[] }[]
+    entries: {
+      agentId: string;
+      leaveDates: string[];
+      annualLeaveDates: string[];
+      compLeaveDates?: string[];
+    }[]
   ) => {
     const result = await agentAPI.confirmMonthlySchedule({ scheduleMonth, entries });
     if (result?.statusCode && result.statusCode !== 200) {
@@ -134,16 +166,20 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     const selectedleaveMapping:EventInput[] = [];
     const selectedANDatesMapping: { [key: number]: {name:string; date:DateObject[]} } = {};
     const selectedannualleaveMapping:EventInput[] = [];
+    const selectedMWDatesMapping: { [key: number]: {name:string; date:DateObject[]} } = {};
+    const selectedmandatoryworkMapping:EventInput[] = [];
 
     if(agentList){
       const filteredinfo = agentList.map(({id, ...rest}) => rest); // id를 제외한 데이터로 변환
       filteredinfo.forEach((agent, rowid) => {
         const description = agent.description;
         const annualleave = agent.annualleave;
+        const mandatory_workday = agent.mandatory_workday || '';
         const name = agent.name;
         // 빈 값('')은 날짜가 없는 것으로 처리 (초기화된 직원 등)
         const serverDates = description.split(',').map((date: string) => date.trim()).filter((date: string) => date.length > 0);
         const serverANDates = annualleave.split(',').map((date: string) => date.trim()).filter((date: string) => date.length > 0);
+        const serverMWDates = mandatory_workday.split(',').map((date: string) => date.trim()).filter((date: string) => date.length > 0);
 
         const dateObjects = serverDates.map((dateStr: string) => {
           const [year, month, day] = dateStr.split('-').map(Number);
@@ -157,6 +193,12 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         });
         selectedANDatesMapping[rowid] = { name, date: dateANObjects };
 
+        const dateMWObjects = serverMWDates.map((dateStr: string) => {
+          const [year, month, day] = dateStr.split('-').map(Number);
+          return new DateObject({ year, month, day });
+        });
+        selectedMWDatesMapping[rowid] = { name, date: dateMWObjects };
+
         const eventInput:EventInput[] = serverDates.map((date: string) => {
           return {title:name,start:date};
         });
@@ -166,6 +208,11 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
           return {title:name,start:date};
         });
         selectedannualleaveMapping.push(...eventANInput); //selectedannualleaveMapping eventInput 추가
+
+        const eventMWInput:EventInput[] = serverMWDates.map((date: string) => {
+          return {title:name,start:date};
+        });
+        selectedmandatoryworkMapping.push(...eventMWInput); //selectedmandatoryworkMapping eventInput 추가
       });
 
       // setLeaveList 업데이트
@@ -179,14 +226,17 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
 
       // selectedDates 업데이트
       setSelectedAnnualleave(selectedANDatesMapping);
+
+      // 필수 근무일 업데이트
+      setMandatoryWorkList(selectedmandatoryworkMapping);
+      setSelectedMandatoryWork(selectedMWDatesMapping);
     }
   };
 
   useEffect(() => {
     (async () => {
       const result = await agentAPI.getAgentinfo();
-      setAgentList(result.agentinfos);
-      console.log(agentList);
+      setAgentList(sortByJobRank(result.agentinfos));
       const count = await agentAPI.getAgentCount();
       setRows(count.response);
     })();
@@ -247,8 +297,10 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         agentList,
         selectedDates,
         selectedAnnualleave,
+        selectedMandatoryWork,
         leaveList,
         annualLeaveList,
+        mandatoryWorkList,
         scheduleEssentialWork,
         holiday,
         alternativeholiday,
@@ -265,6 +317,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         syncAgentList,
         setSelectedDates,
         setSelectedAnnualleave,
+        setSelectedMandatoryWork,
         setSelectedDateList,
         setScheduleEssentialWork,
         setHoliday,

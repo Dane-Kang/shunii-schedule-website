@@ -5,6 +5,7 @@ export interface AgentinfoDto {
   joblevel: string;
   description: string;
   annualleave: string;
+  mandatoryworkday: string;
 }
 
 export interface AgentinfoEntity extends RowDataPacket {
@@ -13,9 +14,10 @@ export interface AgentinfoEntity extends RowDataPacket {
   joblevel: string;
   description: string;
   annualleave: string;
+  mandatory_workday: string;
 }
 
-export type LeaveType = 'leave' | 'annual';
+export type LeaveType = 'leave' | 'annual' | 'comp';
 
 export interface MonthlyLeaveDto {
   agentId: string;
@@ -30,6 +32,7 @@ export interface ConfirmScheduleBody {
     agentId: string;
     leaveDates: string[];
     annualLeaveDates: string[];
+    compLeaveDates?: string[];
   }[];
 }
 

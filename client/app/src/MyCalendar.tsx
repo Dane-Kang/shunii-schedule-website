@@ -2,16 +2,18 @@ import React from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { EventInput, DatesSetArg, DayCellContentArg } from '@fullcalendar/core';
+import { EventInput, DatesSetArg, DayCellContentArg, EventDropArg } from '@fullcalendar/core';
 import './MyCalendar.css'
 import { useAgent } from "./hooks/useAgentinfo";
 import { getHolidayName } from "./koreanHolidays";
 
 interface MyCalendarProps {
   events: EventInput[];
+  editable?: boolean;                       // 생성 미리보기일 때만 true
+  onEventDrop?: (info: EventDropArg) => void; // 휴무를 다른 날짜로 드래그했을 때
 }
 
-const MyCalendar: React.FC<MyCalendarProps> = ({ events }) => {
+const MyCalendar: React.FC<MyCalendarProps> = ({ events, editable = false, onEventDrop }) => {
   const { setCurrentMonth } = useAgent();
 
   const handleDatesSet = (arg: DatesSetArg) => {
@@ -49,6 +51,9 @@ const MyCalendar: React.FC<MyCalendarProps> = ({ events }) => {
           right: 'dayGridMonth',
         }}
         events={events}
+        editable={editable}          // 미리보기일 때만 드래그 이동 허용
+        eventDurationEditable={false}
+        eventDrop={onEventDrop}
         datesSet={handleDatesSet} // 현재 달 변경 감지
         dayCellClassNames={dayCellClassNames}
         dayCellContent={dayCellContent}
