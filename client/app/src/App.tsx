@@ -20,6 +20,7 @@ function App() {
     agentList,
     selectedDates,
     scheduleEssentialWork,
+    directorFullQuota,
     scheduleDate,
     selectedSubjob1,
     selectedSubjob2,
@@ -137,7 +138,10 @@ function App() {
     }
 
     //#################### 0-3. 직급 판별 헬퍼
-    const isDirector = (e: Agentinfo) => e.job_level === "점장"; // 점장: 사전 확정 휴무일에만 쉼 (알고리즘 배정 제외)
+    const isDirector = (e: Agentinfo) => e.job_level === "점장";
+    // 점장을 알고리즘의 휴무 배정(의무 휴무 쿼터·강제휴무·대체휴무 등)에서 뺄지 여부.
+    //  directorFullQuota = false(기본): 사전 확정 휴무일에만 쉼 / true: 다른 직원과 동일하게 배정 대상
+    const directorExempt = (e: Agentinfo) => isDirector(e) && !directorFullQuota;
     const isTopAdmin = (e: Agentinfo) => e.job_level === "점장" || e.job_level === "2층 부점장"; // 점장·부점장
     const isPureManager = (e: Agentinfo) => e.job_level === "1층 매니저" || e.job_level === "2층 매니저";
     const isSenior = (e: Agentinfo) => isTopAdmin(e) || isPureManager(e); // 책임급 (점장·매니저·부점장)
@@ -320,7 +324,7 @@ function App() {
         // 기본 후보군: 점장 제외 + 의무휴무 미달 + 오늘 사전휴무 아님 + 최소 근무 간격 준수 + 필수 근무일 아님
         const baseCandidates = agentData.filter(
           (emp) =>
-            !isDirector(emp) &&
+            !directorExempt(emp) &&
             leaveCounter[emp.name] < maxLeavesPerEmployee &&
             !employeeleaveSchedule[emp.name].includes(date) &&
             !isMandatoryWork(emp.name, date) &&
@@ -341,7 +345,7 @@ function App() {
         agentData
           .filter(
             (emp) =>
-              !isDirector(emp) &&
+              !directorExempt(emp) &&
               !employeeleaveSchedule[emp.name].includes(date) &&
               !isMandatoryWork(emp.name, date) &&
               consecutiveWorkDays(emp.name, day) >= maxWorkGap - 1
@@ -395,7 +399,7 @@ function App() {
               const pool = agentData
                 .filter(
                   (emp) =>
-                    !isDirector(emp) &&
+                    !directorExempt(emp) &&
                     !tried.has(emp.name) &&
                     !offDutyEmployees[date].includes(emp.name) &&
                     !isMandatoryWork(emp.name, date) &&
@@ -430,7 +434,7 @@ function App() {
       //#################### 4. 대체 휴무: 공휴일(alteroffday)에 근무한 인원은 그만큼 의무 휴무가 늘어난다
       const holidayCredit: { [key: string]: number } = {};
       agentData.forEach((emp) => {
-        holidayCredit[emp.name] = isDirector(emp)
+        holidayCredit[emp.name] = directorExempt(emp)
           ? 0
           : alteroffday.filter((d) => !employeeleaveSchedule[emp.name].includes(dateOf(d))).length;
       });
@@ -439,7 +443,7 @@ function App() {
       //#################### 5. 의무 휴무(+대체 휴무) 미달 인원 배치 (점장 제외)
       //  기존 휴무와 가장 멀고 그 날 휴무자가 적은 날부터. 1차는 최소 간격 준수, 못 채우면 간격 완화(≥2).
       agentData.forEach((employee) => {
-        if (isDirector(employee)) return;
+        if (directorExempt(employee)) return;
         const failed = new Set<number>();
         let guard = 0;
         for (const minGap of [minWorkGap, 2]) {
@@ -483,7 +487,7 @@ function App() {
       //  각 인원의 휴무 사이(그리고 월초~첫휴무, 마지막휴무~월말) 간격이 maxWorkGap 이상이면
       //  그 구간 안에 하루 휴무를 끼워 넣는다. 최소 근무 인원만 지켜지면 배치.
       agentData.forEach((emp) => {
-        if (isDirector(emp)) return;
+        if (directorExempt(emp)) return;
         let guard = 0;
         let progressed = true;
         while (progressed && guard++ < 80) {
@@ -533,7 +537,7 @@ function App() {
 
       // (1) 의무 휴무(+공휴일 근무 대체휴무) 쿼터 미달/초과 (점장 제외)
       agentData.forEach((emp) => {
-        if (isDirector(emp)) return;
+        if (directorExempt(emp)) return;
         const credit = alteroffday.filter(
           (d) => !st.employeeleaveSchedule[emp.name].includes(dateOf(d))
         ).length;
@@ -578,7 +582,7 @@ function App() {
       // (4) 인원별 연속 근무일: 목표 3일 이하, 예외 4일, 5일 이상은 심각
       const maxStreakAllowed = maxWorkGap - 1; // 4일
       agentData.forEach((emp) => {
-        if (isDirector(emp)) return;
+        if (directorExempt(emp)) return;
         const leaveDays = st.employeeleaveSchedule[emp.name]
           .map((d) => parseInt(d.split("-")[2]))
           .filter((d) => !Number.isNaN(d))

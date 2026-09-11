@@ -35,11 +35,13 @@ const Table: React.FC = () => {
     setSelectedMandatoryWork,
     setSelectedDateList,
     scheduleEssentialWork,
+    directorFullQuota,
     holiday,
     alternativeholiday,
     selectedSubjob1,
     selectedSubjob2,
     setScheduleEssentialWork,
+    setDirectorFullQuota,
     setHoliday,
     setAlternativeholiday,
     setSelectedSubjob1,
@@ -278,6 +280,10 @@ const Table: React.FC = () => {
     });
   };
 
+  const handleDirectorFullQuotaChange = (value: string) => {
+    setDirectorFullQuota(value === "true");
+  };
+
   const handleCheckboxChange = (rowIndex: number, checked: boolean) => {
     const newData = data.map((row, rIdx) => {
       if(rIdx === rowIndex){
@@ -354,6 +360,27 @@ const Table: React.FC = () => {
                 />
               </td>
             ))}
+          </tr>
+        </tbody>
+      </table>
+      <div style={{ height: "5px" }}></div> {/* 여백 추가 */}
+      <table className='table-style'>
+        <thead>
+          <tr>
+            <th style={{ width: '260px' }}>점장 휴무 방식</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ width: '260px' }}>
+              <select
+                value={directorFullQuota ? "true" : "false"}
+                onChange={(e) => handleDirectorFullQuotaChange(e.target.value)}
+              >
+                <option value="false">사전 확정 휴무일에만 쉼</option>
+                <option value="true">직원과 동일하게 의무 휴무 적용</option>
+              </select>
+            </td>
           </tr>
         </tbody>
       </table>

@@ -41,6 +41,8 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
   const [mandatoryWorkList, setMandatoryWorkList] = useState<EventInput[]>([]);
   // [1인당 휴일, 평일 근무 인원(주말 +1), 최소 책임급 수, 필수 1층 인원, 필수 2층 인원]
   const [scheduleEssentialWork, setScheduleEssentialWork] = useState<number[]>([8,6,1,3,2]);
+  // 점장 휴무 방식: false(기본) = 사전 확정 휴무일에만 쉼 / true = 다른 직원처럼 의무 휴무(1인당 휴일)까지 배정
+  const [directorFullQuota, setDirectorFullQuota] = useState<boolean>(false);
   const [holiday, setHoliday] = useState<DateObject[]>([]);
   const [alternativeholiday, setAlternativeholiday] = useState<DateObject[]>([]);
   const [selectedSubjob1, setSelectedSubjob1] = useState<string[]>([]);
@@ -264,6 +266,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         if (Array.isArray(s.subjob2)) setSelectedSubjob2(s.subjob2);
         if (Array.isArray(s.essentialWork) && s.essentialWork.length >= 5)
           setScheduleEssentialWork(s.essentialWork);
+        if (typeof s.directorFullQuota === "boolean") setDirectorFullQuota(s.directorFullQuota);
       } catch (err) {
         console.error("getSettings error", err);
       } finally {
@@ -272,7 +275,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     })();
   }, []);
 
-  // 보조직무 / 필수 근무 조건이 바뀌면 (최초 로드 이후) 디바운스 후 서버에 자동 저장
+  // 보조직무 / 필수 근무 조건 / 점장 휴무 방식이 바뀌면 (최초 로드 이후) 디바운스 후 서버에 자동 저장
   useEffect(() => {
     if (!appSettingsLoadedRef.current) return;
     const timer = setTimeout(() => {
@@ -281,11 +284,12 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
           subjob1: selectedSubjob1,
           subjob2: selectedSubjob2,
           essentialWork: scheduleEssentialWork,
+          directorFullQuota,
         })
         .catch((err) => console.error("updateSettings error", err));
     }, 800);
     return () => clearTimeout(timer);
-  }, [selectedSubjob1, selectedSubjob2, scheduleEssentialWork]);
+  }, [selectedSubjob1, selectedSubjob2, scheduleEssentialWork, directorFullQuota]);
 
   return (
     <AgentContext.Provider
@@ -302,6 +306,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         annualLeaveList,
         mandatoryWorkList,
         scheduleEssentialWork,
+        directorFullQuota,
         holiday,
         alternativeholiday,
         selectedSubjob1,
@@ -320,6 +325,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         setSelectedMandatoryWork,
         setSelectedDateList,
         setScheduleEssentialWork,
+        setDirectorFullQuota,
         setHoliday,
         setAlternativeholiday,
         setSelectedSubjob1,
