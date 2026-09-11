@@ -1,6 +1,6 @@
-CREATE DATABASE IF NOT EXISTS dev_portfolio;
+CREATE DATABASE IF NOT EXISTS leave_schedule;
 
-USE dev_portfolio;
+USE leave_schedule;
 
 CREATE TABLE IF NOT EXISTS `agent_informations` (
   `agent_information_id` CHAR(36) NOT NULL,

@@ -4,11 +4,11 @@ services:
   db:
     image: mysql:5.7
     platform: linux/amd64
-    container_name: dev-portfolio-mysql
+    container_name: leave-schedule-mysql
     ports:
       - ${DB_PORT}:3306
     networks:
-      - dev-portfolio
+      - leave-schedule
     volumes:
       - ./.db/etc/my.cnf:/etc/my.cnf
       - ./.db/etc/mysqld.cnf:/etc/mysql/mysql.conf.d/mysqld.cnf
@@ -26,15 +26,15 @@ services:
     build:
       context: .
       dockerfile: dockerfile
-    image: dev-portfolio-nodejs-image
-    container_name: dev-portfolio-nodejs-container
+    image: leave-schedule-nodejs-image
+    container_name: leave-schedule-nodejs-container
     ports:
       - ${PORT}:${PORT}
     networks:
-      - dev-portfolio
+      - leave-schedule
     env_file:
       - ../config/.server.env
     restart: always
 
 networks:
-  dev-portfolio:
+  leave-schedule:
