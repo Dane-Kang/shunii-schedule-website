@@ -4,7 +4,8 @@ import "./App.css";
 import "./styles.css";
 
 import MyCalendar from "./MyCalendar";
-import { EventInput, EventDropArg } from "@fullcalendar/core";
+import { EventInput, EventDropArg, EventClickArg, EventContentArg } from "@fullcalendar/core";
+import { DateClickArg } from "@fullcalendar/interaction";
 import { DateObject } from "react-multi-date-picker"; // DateObject를 임포트
 import Table from "./ReactTable";
 import { KOREAN_HOLIDAYS } from "./koreanHolidays";
@@ -41,6 +42,10 @@ function App() {
   >([]);
   const [generatedMonth, setGeneratedMonth] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState(false);
+  // 달력 수동 편집(미리보기 전용): 삭제 아이콘이 떠 있는 이벤트("이름|날짜") / 추가 위젯이 열려있는 날짜
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [addDate, setAddDate] = useState<string | null>(null);
+  const [addSelection, setAddSelection] = useState<string>("");
 
   const jobLevelColors: { [key: string]: string } = {
     "점장": "#b6003b",  // 짙은 빨강
@@ -727,6 +732,103 @@ function App() {
     );
   };
 
+  // 달을 옮기거나 미리보기를 벗어나면 열려 있던 삭제 아이콘/추가 위젯을 닫는다
+  useEffect(() => {
+    setPendingDeleteId(null);
+    setAddDate(null);
+    setAddSelection("");
+  }, [currentMonth, isPreview]);
+
+  // 휴무 이벤트 클릭 → 삭제 아이콘 토글 (같은 걸 다시 클릭하면 숨김). 연차는 대상 아님(표에서 관리)
+  const handleEventClick = (info: EventClickArg) => {
+    if (!isPreview) return;
+    const ltype = info.event.extendedProps?.ltype as string | undefined;
+    if (ltype === "annual") return;
+    setAddDate(null); // 다른 곳에서 열려있던 추가 위젯은 닫기
+    const id = info.event.id;
+    setPendingDeleteId((prev) => (prev === id ? null : id));
+  };
+
+  // 삭제 아이콘 클릭 → generatedLeaves 에서 제거
+  const handleDeleteLeave = (name: string, date: string) => {
+    setGeneratedLeaves((prev) => prev.filter((l) => !(l.name === name && l.date === date)));
+    setPendingDeleteId(null);
+  };
+
+  // 이벤트 커스텀 렌더: 제목 + (삭제 아이콘이 열려있는 이벤트면) × 아이콘
+  const renderEventContent = (arg: EventContentArg): React.ReactNode => {
+    const id = arg.event.id;
+    const ltype = arg.event.extendedProps?.ltype as string | undefined;
+    const showX = isPreview && ltype !== "annual" && id === pendingDeleteId;
+    return (
+      <div className="kr-event-row">
+        <span className="kr-event-title">{arg.event.title}</span>
+        {showX && (
+          <span
+            className="kr-event-x"
+            title="삭제"
+            onClick={(e) => {
+              e.stopPropagation();
+              const [name, date] = id.split("|");
+              handleDeleteLeave(name, date);
+            }}
+          >
+            ×
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  // 빈 날짜 클릭 → 그 날짜의 인원 추가 위젯 토글 (같은 날짜를 다시 클릭하면 닫힘)
+  const handleDateClick = (info: DateClickArg) => {
+    if (!isPreview) return;
+    if (!info.dateStr.startsWith(`${currentMonth}-`)) return; // 보이는 달 밖 셀은 무시
+    setPendingDeleteId(null); // 다른 곳에서 열려있던 삭제 아이콘은 닫기
+    setAddDate((prev) => (prev === info.dateStr ? null : info.dateStr));
+    setAddSelection("");
+  };
+
+  // 날짜 셀에 덧붙이는 "인원 추가" 위젯 (addDate 와 일치하는 날짜에만 표시)
+  const renderDayExtra = (dateStr: string): React.ReactNode => {
+    if (!isPreview || addDate !== dateStr) return null;
+    const already = new Set(
+      generatedLeaves.filter((l) => l.date === dateStr).map((l) => l.name)
+    );
+    const candidates = agentData.filter((a) => !already.has(a.name));
+    return (
+      <div
+        className="kr-day-add"
+        // FullCalendar 는 click 이 아니라 mousedown(/touchstart) 시점에 날짜 클릭 판정을 시작하므로
+        // 거기서 전파를 막아야 위젯이 select 클릭에 의해 닫히지 않는다.
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <select value={addSelection} onChange={(e) => setAddSelection(e.target.value)}>
+          <option value="">직원 선택</option>
+          {candidates.map((a) => (
+            <option key={a.name} value={a.name}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={!addSelection}
+          onClick={() => {
+            if (!addSelection) return;
+            setGeneratedLeaves((prev) => [...prev, { name: addSelection, date: dateStr, type: "leave" }]);
+            setAddDate(null);
+            setAddSelection("");
+          }}
+        >
+          +
+        </button>
+      </div>
+    );
+  };
+
   // 스케줄 초기화: 확정 저장 기록(monthly_leaves) 삭제 + 모든 직원의 원하는 휴일/연차 신청 비움
   const resetScheduleTable = async () => {
     if (isConfirming) return;
@@ -802,7 +904,15 @@ function App() {
 
   return (
     <div className="App">
-      <MyCalendar events={calendarEvents} editable={isPreview} onEventDrop={handleEventDrop} />
+      <MyCalendar
+        events={calendarEvents}
+        editable={isPreview}
+        onEventDrop={handleEventDrop}
+        onEventClick={handleEventClick}
+        eventContent={renderEventContent}
+        onDateClick={handleDateClick}
+        renderDayExtra={renderDayExtra}
+      />
       <div style={{ height: "10px" }}></div>
       <div style={{ display: 'flex', gap: '10px', marginLeft: '400px', marginTop: '10px' }}>
         <button onClick={genSch}> Generate </button>
